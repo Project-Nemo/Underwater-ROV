@@ -1,12 +1,12 @@
-int ledDelay8 = 0;
-int ledDelay7 = 250;
-int ledDelay6 = 800;
-int ledDelay5 = 1000;
+int ledDelay8 = 1000;
+int ledDelay7 = 800;
+int ledDelay6 = 250;
+int ledDelay5 = 0;
 
-int ledState8 = LOW;
-int ledState7 = LOW;
-int ledState6 = LOW;
-int ledState5 = LOW;
+int ledState8 = HIGH;
+int ledState7 = HIGH;
+int ledState6 = HIGH;
+int ledState5 = HIGH;
 
 unsigned long previousMicros8 = 0;
 unsigned long previousMicros7 = 0;

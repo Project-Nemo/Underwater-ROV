@@ -1,18 +1,19 @@
 #include <Wire.h>
 
 // for gyro
-#define GYRO_CTRL_REG1 0x20
-#define GYRO_CTRL_REG2 0x21
-#define GYRO_CTRL_REG3 0x22
-#define GYRO_ADDRESS 0x69
+#define gyro_ctrl_reg1 0x20
+#define gyro_ctrl_reg2 0x21
+#define gyro_ctrl_reg3 0x22
+#define gyro_address 0x69
 
 // for acc
-#define ACC_CTRL_REG 0x2d
-#define ACC_ADDRESS (0x53)  // ADXL345 device address 
+#define acc_ctrl_reg 0x2d
+#define acc_address (0x53)  // ADXL345 device address 
 
 int ax, gx;
 int ay, gy;
 int az, gz;
+boolean notDriving = true;
 
 void setup(){
   Wire.begin();
@@ -42,47 +43,55 @@ void loop(){
 
   Serial.print(" GZ:");
   Serial.println(gz);
+
+  if(notDriving) {
+    //reactToReading();
+  }
+}
+
+void react(){
+ 
 }
 
 void powerOn() {
   //Turning on the accelerometer
-  writeRegister(ACC_ADDRESS, ACC_CTRL_REG, 0);   
-  writeRegister(ACC_ADDRESS, ACC_CTRL_REG, 16);
-  writeRegister(ACC_ADDRESS, ACC_CTRL_REG, 8); 
+  writeRegister(acc_address, acc_ctrl_reg, 0);   
+  writeRegister(acc_address, acc_ctrl_reg, 16);
+  writeRegister(acc_address, acc_ctrl_reg, 8); 
     
   //Turning on the gyroscope
-  writeRegister(GYRO_ADDRESS, GYRO_CTRL_REG1, 15);
-  writeRegister(GYRO_ADDRESS, GYRO_CTRL_REG2, 0);
-  writeRegister(GYRO_ADDRESS, GYRO_CTRL_REG3, 8);
+  writeRegister(gyro_address, gyro_ctrl_reg1, 15);
+  writeRegister(gyro_address, gyro_ctrl_reg2, 0);
+  writeRegister(gyro_address, gyro_ctrl_reg3, 8);
 }
 
 void getAccValues(){
 
-  byte xMSB = readRegister(ACC_ADDRESS, 0x33); //51
-  byte xLSB = readRegister(ACC_ADDRESS, 0x32); //50
+  byte xMSB = readRegister(acc_address, 0x33); //51
+  byte xLSB = readRegister(acc_address, 0x32); //50
   ax = ((xMSB << 8) | xLSB);
 
-  byte yMSB = readRegister(ACC_ADDRESS, 0x35); //53
-  byte yLSB = readRegister(ACC_ADDRESS, 0x34); //52
+  byte yMSB = readRegister(acc_address, 0x35); //53
+  byte yLSB = readRegister(acc_address, 0x34); //52
   ay = ((yMSB << 8) | yLSB);
 
-  byte zMSB = readRegister(ACC_ADDRESS, 0x37); //55
-  byte zLSB = readRegister(ACC_ADDRESS, 0x36); //54
+  byte zMSB = readRegister(acc_address, 0x37); //55
+  byte zLSB = readRegister(acc_address, 0x36); //54
   az = ((zMSB << 8) | zLSB);
 }
 
 void getGyroValues(){
 
-  byte xMSB = readRegister(GYRO_ADDRESS, 0x29); //41
-  byte xLSB = readRegister(GYRO_ADDRESS, 0x28); //40
+  byte xMSB = readRegister(gyro_address, 0x29); //41
+  byte xLSB = readRegister(gyro_address, 0x28); //40
   gx = ((xMSB << 8) | xLSB);
 
-  byte yMSB = readRegister(GYRO_ADDRESS, 0x2B); //43
-  byte yLSB = readRegister(GYRO_ADDRESS, 0x2A); //42
+  byte yMSB = readRegister(gyro_address, 0x2B); //43
+  byte yLSB = readRegister(gyro_address, 0x2A); //42
   gy = ((yMSB << 8) | yLSB);
 
-  byte zMSB = readRegister(GYRO_ADDRESS, 0x2D); //45
-  byte zLSB = readRegister(GYRO_ADDRESS, 0x2C); //44
+  byte zMSB = readRegister(gyro_address, 0x2D); //45
+  byte zLSB = readRegister(gyro_address, 0x2C); //44
   gz = ((zMSB << 8) | zLSB);
 }
 
