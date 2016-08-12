@@ -24,6 +24,34 @@ void setup(){
 
 void loop(){
   getAccValues(); // read the accelerometer values and store them in variables x,y,z
+  getGyroValues();  // read the gyroscope values and store them in variables x,y,z
+  if(notDriving) {
+    reactToReading();
+  }
+}
+
+void reactToReading(){
+  //    - <- -> +
+  //      Z Axis
+  //        |
+  //  |-----------|
+  //  |  Camera   |
+  //  |           |     
+  //  | LT     RT | - Y Axis
+  //  |           |
+  //  |           |
+  //  |-----------|
+  //  
+  // Top view of ROV, where IMU is placed so that z-axis is in line with camera
+  // LT = Left Thruster - Vertical
+  // RT = Right Thruster - Vertical
+
+  // PSEUDO CODE!
+  // If gz is positive, LT go down, RT go up
+  // If gz is negative, LT go up, RT go down
+}
+
+void printReadings(){
   Serial.print("AX:");
   Serial.print(ax);
 
@@ -32,9 +60,7 @@ void loop(){
 
   Serial.print(" AZ:");
   Serial.print(az);
-
   
-  getGyroValues();  // read the gyroscope values
   Serial.print("  GX:");
   Serial.print(gx);
 
@@ -43,14 +69,6 @@ void loop(){
 
   Serial.print(" GZ:");
   Serial.println(gz);
-
-  if(notDriving) {
-    //reactToReading();
-  }
-}
-
-void react(){
- 
 }
 
 void powerOn() {
