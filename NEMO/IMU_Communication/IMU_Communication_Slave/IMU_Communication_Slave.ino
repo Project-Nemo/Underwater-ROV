@@ -106,12 +106,18 @@ int volts;    // variable to read the voltage from the analog pin
 int x,y,z; //triple axis data for the digital compass.
 int angle; //calculated horizontal heading angle.
 
+// variables for storing accelerometer values
+int ax, ay, az;
+// variables for storing gryoscope values
+int gx, gy, gz;
+
+// IMU data arrays to allow moving averages to be calculated
 int ax[DATA_LENGTH];
 int ay[DATA_LENGTH];
-int az[DATA_LENGTH]; // variables for storing accelerometer values
+int az[DATA_LENGTH]; 
 int gx[DATA_LENGTH];
 int gy[DATA_LENGTH];
-int gz[DATA_LENGTH]; // variables for storing gryoscope values
+int gz[DATA_LENGTH]; 
 
 float MS5803Press;  //Pressure from the MS5803 Sensor.
 float MS5803Temp;  //Temperature from the MS5803 Sensor.
@@ -149,8 +155,6 @@ struct SEND_DATA_STRUCTURE{
 //give a name to the group of data
 RECEIVE_DATA_STRUCTURE rxdata;
 SEND_DATA_STRUCTURE txdata;
-
-
 
 void setup()
 {
@@ -193,6 +197,7 @@ void setup()
   sensor.initializeMS_5803();
   
   powerOnIMU(); // setup the accelerometer and gyroscope
+  initIMUArrays(); // make all values in IMU arrays 0
 
   delay(10000);   //Ten second delay
     //The ESC should now be initialised and ready to run.
@@ -311,10 +316,8 @@ void loop()
   //it won't be used at this stage.
     
   txdata.ROVDepth = (MS5803Press-1013)/98.1; //ROV depth reading (m)
-
-  getAccValues(); // read the accelerometer values and store them in variables x,y,z  
-  getGyroValues();  // read the gyroscope values    
-  printIMU();  // REMOVE THIS AFTER TESTS
+  
+  readIMUData();  // REMOVE THIS AFTER TESTS
 }
 
 
@@ -389,24 +392,50 @@ int readRegister(int deviceAddress, byte address){
     return v;
 }
 
-void printIMU(){
+void readIMUData(){
+  getAccValues();   // read the accelerometer values 
+  getGyroValues();  // read the gyroscope values    
+
+  // caluclate moving average values and send them to master
   Serial.print("AX:");
   Serial.print(ax);
-  txdata.AccX = ax;
+  txdata.AccX = movingAverage(AccX, ax);
   Serial.print(" AY:");
-  txdata.AccY = ay;
+  txdata.AccY = movingAverage(AccY, ay);
   Serial.print(ay);
   Serial.print(" AZ:");
   Serial.print(az);
-  txdata.AccZ = az;
+  txdata.AccZ = movingAverage(AccZ, az);
   Serial.print("  GX:");
   Serial.print(gx);
-  txdata.GyroX = gx;
+  txdata.GyroX = movingAverage(GyroX, gx);
   Serial.print(" GY:");
   Serial.print(gy);
-  txdata.GyroY = gy;
+  txdata.GyroY = movingAverage(GyroY, gy);
   Serial.print(" GZ:");
   Serial.println(gz);  
-  txdata.GyroZ = gz;
+  txdata.GyroZ = movingAverage(GyroZ, gz);
+}
+
+void initIMUArrays(){
+  for(int i = 0; i < DATA_LENGTH; i++){
+    ax[i] = 0;
+    ay[i] = 0;
+    az[i] = 0;
+    gx[i] = 0;
+    gy[i] = 0;
+    gz[i] = 0;
+  }
+}
+
+int movingAverage(int[] data, int newVal){
+  double total = 0;
+  for(int i = 1; i < DATA_LENGTH - 1; i++){
+    data[i-1] = data[i];
+    total = total + data[i-1];
+  }
+  data[DATA_LENGTH - 1] = newVal;
+  total = total + newVal;
+  return total/DATA_LENGTH;
 }
 
