@@ -63,7 +63,7 @@
 #include <EasyTransfer.h> // Bill Porter's Easy Transfer Library
 #include <MS5803_14.h> //Library for the MS5803-14BA
 
-#define DATA_LENGTH 5
+#define DATA_LENGTH 10
 
 EasyTransfer ETin, ETout;  //Create the two Easy transfer Objects for
 // Two way communication
@@ -111,6 +111,15 @@ int ax, ay, az;
 // variables for storing gryoscope values
 int gx, gy, gz;
 
+// Overall rotation values (for stable readings)
+unsigned long last_read_time;
+float         last_x_angle;  // These are the filtered angles
+float         last_y_angle;
+float         last_z_angle;  
+float         last_gyro_x_angle;  // Store the gyro angles to compare drift
+float         last_gyro_y_angle;
+float         last_gyro_z_angle;
+
 // IMU data arrays to allow moving averages to be calculated
 int axData[DATA_LENGTH];
 int ayData[DATA_LENGTH];
@@ -118,6 +127,14 @@ int azData[DATA_LENGTH];
 int gxData[DATA_LENGTH];
 int gyData[DATA_LENGTH];
 int gzData[DATA_LENGTH];
+
+//  Base accel and gryo values for calibration offset
+float    base_x_accel;
+float    base_y_accel;
+float    base_z_accel;
+float    base_x_gyro;
+float    base_y_gyro;
+float    base_z_gyro;
 
 // station keeping variables for PID
 double oldAngle = 0, angSum = 0, PID = 0;      // PID variables
@@ -202,7 +219,8 @@ void setup()
   sensor.initializeMS_5803();
 
   powerOnIMU(); // setup the accelerometer and gyroscope
-  initIMUArrays(); // make all values in IMU arrays 0
+  calibrateSensors();
+  setLastReadAngle(millis(), 0, 0, 0, 0, 0, 0);
 
   delay(10000);   //Ten second delay
   //The ESC should now be initialised and ready to run.
@@ -222,8 +240,7 @@ void setup()
 
 }
 
-void loop()
-{
+void loop() {
   // Send the message to the serial port for the ROV Arduino
   ETout.sendData();
 
@@ -244,41 +261,35 @@ void loop()
 
   //The camera settings are status flags so we will need to trigger the events based on
   //changes in the data.
-  if (rxdata.CamRec && !CamRecd) //If the signal is to trigger video recording
+  if (rxdata.CamRec && !CamRecd) { //If the signal is to trigger video recording
     //and the Camera is not already triggered drop the camera recording pin to LOW.
-  {
     CamRecTrigger(); //Run the camera triggering signal
     CamRecd = true; //update the flag.
   }
-  if (!rxdata.CamRec && CamRecd) //If the camera no longer needing to trigger
+  if (!rxdata.CamRec && CamRecd) { //If the camera no longer needing to trigger
     // then signal the camera and turn off the flag.
-  {
     CamRecTrigger(); //Run the camera triggering signal
     CamRecd = false; //update the flag.
   }
 
-  if (rxdata.CamPhotoShot && !CamPhoto) //If the camera is required to fire a shot trigger
+  if (rxdata.CamPhotoShot && !CamPhoto) { //If the camera is required to fire a shot trigger
     // the camera photo pin.
-  {
     digitalWrite(CamPhotTrig, LOW); //Trip the photo trigger pin.
     TriggerHoldTm = millis();  //Reset the time that a camera trigger was used.
     CamPhoto = true; //update the flag.
   }
 
-  if (!rxdata.CamPhotoShot && CamPhoto) //If the camera photo signal ceases
+  if (!rxdata.CamPhotoShot && CamPhoto) { //If the camera photo signal ceases
     // reset the camera flag.
-  {
     CamPhoto = false; //update the flag.
   }
 
 
-  if (millis() - TriggerHoldTm > TriggerHoldDuration) //If camera button held long enough release it.
+  if (millis() - TriggerHoldTm > TriggerHoldDuration) { //If camera button held long enough release it.
     // hopefully this little routine will speed up the sketch processing.
-  {
     digitalWrite(CamRecTrig, HIGH);
     digitalWrite(CamPhotTrig, HIGH); //Just make them both inactive
   }
-
 
   delay(18);  //This delay is added to give the ROV a chance to
   //return data
@@ -296,8 +307,7 @@ void loop()
 
   //Read data from each axis
   Wire.requestFrom(hmc5883Address, 6);
-  if (6 <= Wire.available())
-  {
+  if (6 <= Wire.available()) {
     x = Wire.read() << 8; //X msb
     x |= Wire.read();   //X lsb
     z = Wire.read() << 8; //Z msb
@@ -307,8 +317,7 @@ void loop()
   }
 
   angle = atan2(-y, x) / M_PI * 180;
-  if (angle < 0)
-  {
+  if (angle < 0) {
     angle = angle + 360;
   }
   txdata.ROVHDG = angle;  //ROV direction (Degrees)
@@ -322,12 +331,15 @@ void loop()
 
   txdata.ROVDepth = (MS5803Press - 1013) / 98.1; //ROV depth reading (m)
 
-  readIMUData();  // REMOVE THIS AFTER TESTS
+  readIMUData();  
+  calculateAccelAndGryoAngles();
+
+  // TODO sationkeeping code trigger here
+  
 }
 
 
-void CamRecTrigger()
-{
+void CamRecTrigger() {
   digitalWrite(CamRecTrig, LOW); //Trip the recorder toggle.
   TriggerHoldTm = millis();  //Reset the time that a camera trigger was used.
 }
@@ -402,23 +414,12 @@ void readIMUData() {
   getGyroValues();  // read the gyroscope values
 
   // caluclate moving average values and send them to master
-  txdata.AccX = movingAverage(axData, ax);
-  txdata.AccY = movingAverage(ayData, ay);
-  txdata.AccZ = movingAverage(azData, az);
-  txdata.GyroX = movingAverage(gxData, gx);
-  txdata.GyroY = movingAverage(gyData, gy);
-  txdata.GyroZ = movingAverage(gzData, gz);
-}
-
-void initIMUArrays() {
-  for (int i = 0; i < DATA_LENGTH; i++) {
-    axData[i] = 0;
-    ayData[i] = 0;
-    azData[i] = 0;
-    gxData[i] = 0;
-    gyData[i] = 0;
-    gzData[i] = 0;
-  }
+  txdata.AccX = movingAverage(axData, ax - base_x_accel);
+  txdata.AccY = movingAverage(ayData, ay - base_y_accel);
+  txdata.AccZ = movingAverage(azData, az - base_z_accel);
+  txdata.GyroX = movingAverage(gxData, gx - last_gyro_x_angle);
+  txdata.GyroY = movingAverage(gyData, gy - last_gyro_y_angle);
+  txdata.GyroZ = movingAverage(gzData, gz - last_gyro_z_angle);
 }
 
 double movingAverage(int data[], int newVal) {
@@ -448,7 +449,7 @@ double movingAverage(int data[], int newVal) {
   // RT = Right Thruster - Vertical
 void stationKeepRoll() {
   // use moving average to avoid reacting to transients
-  double roll = txdata.GyroZ;   
+  double roll = txdata.GyroY;   
   //  After you've read the angle from 0 (roll)
   angSum += roll;
   PID = cP*roll + cI*angSum + cD*(roll - oldAngle);
@@ -457,11 +458,133 @@ void stationKeepRoll() {
   //  Output adjustment
   //  <output> -> PIDScale*PID + PIDShift;
   
-  int leftVal = PIDScale*PID + PIDShift;
-  int rightVal = -leftval;
-
+  int leftVal = PIDScale*PID + PIDShift;   // TODO: NEED TO COME UP WITH APPROPRIATE TRANSFROMATION HERE
+  int diff = 90 - leftVal;
+  int rightVal = 90 + diff;
+  
   // Send values to thruster
    ESCVL.write(leftVal);   
    ESCVR.write(rightVal);  
 }
 
+void calibrateSensors() {  
+  Serial.println("Starting Calibration"); 
+  
+  // Read and average the raw values from the IMU
+  for (int i = 0; i < DATA_LENGTH; i++) {
+    getAccValues();   
+    getGyroValues();
+    axData[i] = ax;
+    ayData[i] = ay;
+    azData[i] = az;
+    gxData[i] = gx;
+    gyData[i] = gy;
+    gzData[i] = gz;
+    delay(100);
+  }
+
+  // Discard the first set of values read from the IMU
+  getAccValues();   
+  getGyroValues();
+  axData[0] = ax;
+  ayData[0] = ay;
+  azData[0] = az;
+  gxData[0] = gx;
+  gyData[0] = gy;
+  gzData[0] = gz;
+    
+  // Store the raw calibration values globally
+  base_x_accel = movingAverage(axData, ax);
+  base_y_accel = movingAverage(ayData, ay);
+  base_z_accel = movingAverage(azData, az);
+  base_x_gyro = movingAverage(gxData, gx);
+  base_y_gyro = movingAverage(gyData, gy);
+  base_z_gyro = movingAverage(gzData, gz);
+  
+  Serial.println("Finished Calibration");
+}
+
+void setLastReadAngle(unsigned long time, float x, float y, float z, float x_gyro, float y_gyro, float z_gyro) {
+  last_read_time = time;
+  last_x_angle = x;
+  last_y_angle = y;
+  last_z_angle = z;
+  last_gyro_x_angle = x_gyro;
+  last_gyro_y_angle = y_gyro;
+  last_gyro_z_angle = z_gyro;
+}
+
+void calculateAccelAndGryoAngles() {
+  int error;
+  double dT;
+  int valueIndex = DATA_LENGTH - 1;
+  
+  // Get the time of reading for rotation computations
+  unsigned long t_now = millis();
+
+  float FS_SEL = 131;
+  float gyro_x = (gxData[valueIndex])/FS_SEL;
+  float gyro_y = (gyData[valueIndex])/FS_SEL;
+  float gyro_z = (gzData[valueIndex])/FS_SEL;
+  
+  
+  // Get raw acceleration values
+  // float G_CONVERT = 16384;
+  float accel_x = axData[valueIndex];
+  float accel_y = ayData[valueIndex];
+  float accel_z = azData[valueIndex];
+  
+  // Get angle values from accelerometer
+  float RADIANS_TO_DEGREES = 180/3.14159;
+  //  float accel_vector_length = sqrt(pow(accel_x,2) + pow(accel_y,2) + pow(accel_z,2));
+  float accel_angle_y = atan(-1*accel_x/sqrt(pow(accel_y,2) + pow(accel_z,2)))*RADIANS_TO_DEGREES;
+  float accel_angle_x = atan(accel_y/sqrt(pow(accel_x,2) + pow(accel_z,2)))*RADIANS_TO_DEGREES;
+  float accel_angle_z = 0;
+  
+  // Compute the (filtered) gyro angles
+  float dt =(t_now - last_read_time)/1000.0;
+  float gyro_angle_x = gyro_x*dt + last_x_angle;
+  float gyro_angle_y = gyro_y*dt + last_y_angle;
+  float gyro_angle_z = gyro_z*dt + last_z_angle;
+  
+  // Compute the drifting gyro angles
+  float unfiltered_gyro_angle_x = gyro_x*dt + last_gyro_x_angle;
+  float unfiltered_gyro_angle_y = gyro_y*dt + last_gyro_y_angle;
+  float unfiltered_gyro_angle_z = gyro_z*dt + last_gyro_z_angle;
+  
+  // Apply the complementary filter to figure out the change in angle - choice of alpha is
+  // estimated now.  Alpha depends on the sampling rate...
+  float alpha = 0.96;
+  float angle_x = alpha*gyro_angle_x + (1.0 - alpha)*accel_angle_x;
+  float angle_y = alpha*gyro_angle_y + (1.0 - alpha)*accel_angle_y;
+  float angle_z = gyro_angle_z;  //Accelerometer doesn't give z-angle
+  
+  // Update the saved data with the latest values
+  setLastReadAngle(t_now, angle_x, angle_y, angle_z, unfiltered_gyro_angle_x, unfiltered_gyro_angle_y, unfiltered_gyro_angle_z);
+  
+  // Send the data to the serial port
+  Serial.print(F("DEL:"));              //Delta T
+  Serial.print(dt, DEC);
+  Serial.print(F("#ACC:"));              //Accelerometer angle
+  Serial.print(accel_angle_x, 2);
+  Serial.print(F(","));
+  Serial.print(accel_angle_y, 2);
+  Serial.print(F(","));
+  Serial.print(accel_angle_z, 2);
+  Serial.print(F("#GYR:"));
+  Serial.print(unfiltered_gyro_angle_x, 2);        //Gyroscope angle
+  Serial.print(F(","));
+  Serial.print(unfiltered_gyro_angle_y, 2);
+  Serial.print(F(","));
+  Serial.print(unfiltered_gyro_angle_z, 2);
+  Serial.print(F("#FIL:"));             //Filtered angle
+  Serial.print(angle_x, 2);
+  Serial.print(F(","));
+  Serial.print(angle_y, 2);
+  Serial.print(F(","));
+  Serial.print(angle_z, 2);
+  Serial.println(F(""));
+  
+  // Delay so we don't swamp the serial port
+  delay(5);
+}
