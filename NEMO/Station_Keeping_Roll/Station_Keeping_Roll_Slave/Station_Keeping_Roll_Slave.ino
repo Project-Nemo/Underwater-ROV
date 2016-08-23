@@ -37,8 +37,12 @@
   5V = Supply to the TMP36 temperature sensor.
 
   Communications
+  // SLAVE to MASTER
   Serial Connection: Topside D1 (TX) to ROV D0 (RX)
   Serial Connection: Topside D0 (RX) to ROV D1 (TX)
+  // SLAVE to POD
+  Serial Connection: Pod D7 to Slave D8 (podIn)
+  Serial Connection: Pod D8 to Slave D7 (podOut)
   Connect the GND on both
 
   Please note that the ESCs will all have been programmed by this
@@ -62,11 +66,16 @@
 #include <Servo.h>
 #include <EasyTransfer.h> // Bill Porter's Easy Transfer Library
 #include <MS5803_14.h> //Library for the MS5803-14BA
+#include <SoftwareSerial.h>
 
 #define DATA_LENGTH 10
 
 EasyTransfer ETin, ETout;  //Create the two Easy transfer Objects for
 // Two way communication
+
+// Two way communication between pod and slave
+SoftwareSerial podSerial = SoftwareSerial(7,8);
+EasyTransfer ETpodIn, ETpodOut;
 
 MS_5803 sensor = MS_5803(512);
 
@@ -172,11 +181,24 @@ struct SEND_DATA_STRUCTURE {
   int GyroX;
   int GyroY;
   int GyroZ;
+  int PodPower;   // power of pod in watts
+  int PodState;   // 1 if functioning correctly, 0 otherwise
+};
+
+struct RESEARCH_POD_RECEIVE_DATA {
+  int PodPower;    // watts 
+  int PodState;       // 1 if pod functioning correctly, 0 otherwise
+};
+
+struct RESEARCH_POD_SEND_DATA {
+  int ROVDepth;  // ROV depth reading
 };
 
 //give a name to the group of data
 RECEIVE_DATA_STRUCTURE rxdata;
 SEND_DATA_STRUCTURE txdata;
+RESEARCH_POD_RECEIVE_DATA d7data;  // podOut
+RESEARCH_POD_SEND_DATA d8data;     // podIn
 
 void setup()
 {
@@ -218,16 +240,22 @@ void setup()
   // Initialize the MS5803 sensor.
   sensor.initializeMS_5803();
 
-  powerOnIMU(); // setup the accelerometer and gyroscope
-  calibrateSensors();
-  setLastReadAngle(millis(), 0, 0, 0, 0, 0, 0);
-
   delay(10000);   //Ten second delay
   //The ESC should now be initialised and ready to run.
 
   Serial.begin(9600); //Begin Serial to talk to the Master Arduino
   ETin.begin(details(rxdata), &Serial); //Get the Easy Transfer Library happening through the Serial
   ETout.begin(details(txdata), &Serial);
+
+  podSerial.begin(9600);
+  // Begin Serial communication with research pod
+  ETpodIn.begin(details(d8Data), &podSerial);
+  ETpodOut.begin(details(d7Data), &podSerial);
+
+  powerOnIMU(); // setup the accelerometer and gyroscope
+  delay(5000); // wait for imu to be ready
+  calibrateSensors();
+  setLastReadAngle(millis(), 0, 0, 0, 0, 0, 0);
 
   //The camera starts in record mode probably due to Arduino startup signals
   //and so this needs to be stopped.  The sequence below sends a toggle to
@@ -243,12 +271,14 @@ void setup()
 void loop() {
   // Send the message to the serial port for the ROV Arduino
   ETout.sendData();
+  ETpodIn.sendData();
 
   //Based on Bill Porter's example for the Two Way Easy Transfer Library
   //We will include a loop here to make sure the receive part of the
   //process runs smoothly.
   for (int i = 0; i < 5; i++) {
     ETin.receiveData();
+    ETpodOut.receiveData():
     // We'll do something properly with the returned data at a later s
     ESCVL.write(rxdata.upLraw);  //Set the ESCVL signal to the defined throttle position.
     ESCVR.write(rxdata.upRraw);  //Set the ESCVR signal to the defined throttle position.
@@ -330,6 +360,10 @@ void loop() {
   //it won't be used at this stage.
 
   txdata.ROVDepth = (MS5803Press - 1013) / 98.1; //ROV depth reading (m)
+  d8Data.ROVDepth = txData.ROVDepth;
+
+  txData.PodPower = d7Data.PodPower;
+  txData.PodState = d7Data.PodState;
 
   readIMUData();  
   calculateAccelAndGryoAngles();
