@@ -249,8 +249,8 @@ void setup()
 
   podSerial.begin(9600);
   // Begin Serial communication with research pod
-  ETpodIn.begin(details(d8Data), &podSerial);
-  ETpodOut.begin(details(d7Data), &podSerial);
+  ETpodIn.begin(details(d8data), &podSerial);
+  ETpodOut.begin(details(d7data), &podSerial);
 
   powerOnIMU(); // setup the accelerometer and gyroscope
   delay(5000); // wait for imu to be ready
@@ -278,7 +278,7 @@ void loop() {
   //process runs smoothly.
   for (int i = 0; i < 5; i++) {
     ETin.receiveData();
-    ETpodOut.receiveData():
+    ETpodOut.receiveData();
     // We'll do something properly with the returned data at a later s
     ESCVL.write(rxdata.upLraw);  //Set the ESCVL signal to the defined throttle position.
     ESCVR.write(rxdata.upRraw);  //Set the ESCVR signal to the defined throttle position.
@@ -360,10 +360,10 @@ void loop() {
   //it won't be used at this stage.
 
   txdata.ROVDepth = (MS5803Press - 1013) / 98.1; //ROV depth reading (m)
-  d8Data.ROVDepth = txData.ROVDepth;
+  d8data.ROVDepth = 10;
 
-  txData.PodPower = d7Data.PodPower;
-  txData.PodState = d7Data.PodState;
+  txdata.PodPower = d7data.PodPower;
+  txdata.PodState = d7data.PodState;
 
   readIMUData();  
   calculateAccelAndGryoAngles();
