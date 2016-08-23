@@ -41,8 +41,8 @@
   Serial Connection: Topside D1 (TX) to ROV D0 (RX)
   Serial Connection: Topside D0 (RX) to ROV D1 (TX)
   // SLAVE to POD
-  Serial Connection: Pod D7 to Slave D8 (podIn)
-  Serial Connection: Pod D8 to Slave D7 (podOut)
+  Serial Connection: Pod D7 (RX) to Slave D8 (TX)
+  Serial Connection: Pod D8 (TX) to Slave D7 (RX)
   Connect the GND on both
 
   Please note that the ESCs will all have been programmed by this
@@ -75,7 +75,7 @@ EasyTransfer ETin, ETout;  //Create the two Easy transfer Objects for
 
 // Two way communication between pod and slave
 SoftwareSerial podSerial = SoftwareSerial(7,8);
-EasyTransfer ETpodIn, ETpodOut;
+EasyTransfer ETin2, ETout2;
 
 MS_5803 sensor = MS_5803(512);
 
@@ -197,8 +197,8 @@ struct RESEARCH_POD_SEND_DATA {
 //give a name to the group of data
 RECEIVE_DATA_STRUCTURE rxdata;
 SEND_DATA_STRUCTURE txdata;
-RESEARCH_POD_RECEIVE_DATA d7data;  // podOut
-RESEARCH_POD_SEND_DATA d8data;     // podIn
+RESEARCH_POD_RECEIVE_DATA indata;  // podOut
+RESEARCH_POD_SEND_DATA outdata;     // podIn
 
 void setup()
 {
@@ -249,8 +249,8 @@ void setup()
 
   podSerial.begin(9600);
   // Begin Serial communication with research pod
-  ETpodIn.begin(details(d8data), &podSerial);
-  ETpodOut.begin(details(d7data), &podSerial);
+  ETin2.begin(details(indata), &podSerial);
+  ETout2.begin(details(outdata), &podSerial);
 
   powerOnIMU(); // setup the accelerometer and gyroscope
   delay(5000); // wait for imu to be ready
@@ -271,14 +271,14 @@ void setup()
 void loop() {
   // Send the message to the serial port for the ROV Arduino
   ETout.sendData();
-  ETpodIn.sendData();
+  ETout2.sendData();
 
   //Based on Bill Porter's example for the Two Way Easy Transfer Library
   //We will include a loop here to make sure the receive part of the
   //process runs smoothly.
   for (int i = 0; i < 5; i++) {
     ETin.receiveData();
-    ETpodOut.receiveData();
+    ETin2.receiveData();
     // We'll do something properly with the returned data at a later s
     ESCVL.write(rxdata.upLraw);  //Set the ESCVL signal to the defined throttle position.
     ESCVR.write(rxdata.upRraw);  //Set the ESCVR signal to the defined throttle position.
@@ -360,10 +360,10 @@ void loop() {
   //it won't be used at this stage.
 
   txdata.ROVDepth = (MS5803Press - 1013) / 98.1; //ROV depth reading (m)
-  d8data.ROVDepth = 10;
+  outdata.ROVDepth = 10;
 
-  txdata.PodPower = d7data.PodPower;
-  txdata.PodState = d7data.PodState;
+  txdata.PodPower = indata.PodPower;
+  txdata.PodState = indata.PodState;
 
   readIMUData();  
   calculateAccelAndGryoAngles();
