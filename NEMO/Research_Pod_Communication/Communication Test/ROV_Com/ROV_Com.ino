@@ -64,6 +64,7 @@ void loop(){
   //send the data
   ETout.sendData();
   if(ETin.receiveData()){
+      Serial.println();
       Serial.println(etmydata.num);
   }
   delay(2000);
