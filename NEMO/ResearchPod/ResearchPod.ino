@@ -2,6 +2,7 @@
 #include <SPI.h>
 #include <SD.h>
 #include <Wire.h>
+#include <SoftEasyTransfer.h>
 #include <BH1750.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
@@ -14,7 +15,7 @@
 #define TURBIDITY_OUT A7 
 #define chipSelect 10 //SPI Chip select pin
 
-//#################AS Conductivity########################
+//#################AS Conductivity##############################
 #include <SoftwareSerial.h>                           //we have to include the SoftwareSerial library, or else we can't use it
 #define rx 8                                          //define what pin rx is going to be
 #define tx 9                                          //define what pin tx is going to be
@@ -23,9 +24,8 @@ String inputstring = "";                              //a string to hold incomin
 String sensorstring = "";                             //a string to hold the data from the Atlas Scientific product
 boolean input_string_complete = false;                //have we received all the data from the PC
 boolean sensor_string_complete = false;               //have we received all the data from the Atlas Scientific product
-//#################AS Conductivity########################
 
-
+//#################AS Conductivity################################
 
 BH1750 lightMeter; //Create Light meter object
 
@@ -34,10 +34,23 @@ String fileName;
 OneWire oneWire_in(ONE_WIRE_BUS_1);
 DallasTemperature tempSensor(&oneWire_in);
 
-//#################################################################
-//#################################################################
-//#################################################################
-//#################################################################
+//##################Communcation############################
+SoftwareSerial podSerial(0, 1);
+SoftEasyTransfer SETin, SETout;
+
+struct RESEARCH_POD_SEND_DATA {
+  int PodPower;       // watts 
+  int PodState;       // 1 if pod functioning correctly, 0 otherwise
+};
+
+struct RESEARCH_POD_RECEIVE_DATA {
+  int ROVDepth;  // ROV depth reading
+};
+
+RESEARCH_POD_RECEIVE_DATA podDataIn;  
+RESEARCH_POD_SEND_DATA podDataOut;   
+
+//##########################################################
 
 void setup() {
   
@@ -48,6 +61,10 @@ void setup() {
   inputstring.reserve(10);    //set aside some bytes for receiving data from the PC
   sensorstring.reserve(30);   //set aside some bytes for receiving data from Atlas Scientific product
   tempSensor.begin();
+
+  podSerial.begin(9600);
+  SETin.begin(details(podDataIn), &podSerial); 
+  SETout.begin(details(podDataOut), &podSerial); 
   
   while (!Serial) {
     ; // wait for serial port to connect. Needed for native USB port only
@@ -107,16 +124,11 @@ void setup() {
 
 
 //#################################################################
-//#################################################################
-//#################################################################
-//#################################################################
 
 void loop() {
-  // put your main code here, to run repeatedly:
-
-
+  SETout.sendData();
 //#################AS Conductivity########################
-if (input_string_complete) {                        //if a string from the PC has been received in its entirety
+  if (input_string_complete) {                        //if a string from the PC has been received in its entirety
     myserial.print(inputstring);                      //send that string to the Atlas Scientific product
     myserial.print('\r');                             //add a <CR> to the end of the string
     inputstring = "";                                 //clear the string
@@ -139,6 +151,11 @@ if (input_string_complete) {                        //if a string from the PC ha
     else                                              //if the first character in the string is NOT a digit
     {
       String dataString = "";
+      if(SETin.receiveData()){
+        //dataString += String("DEPTH: ");
+        dataString += String(podDataIn.ROVDepth);
+      }
+            
       //dataString += String("UV:, ");
       dataString += ",";
       dataString += String(read_UV_Sensor());
@@ -176,14 +193,19 @@ if (input_string_complete) {                        //if a string from the PC ha
     sensorstring = "";                                //clear the string
     sensor_string_complete = false;                   //reset the flag used to tell if we have received a completed string from the Atlas Scientific product
   }
+
+  // Communicate power and status code
+  float limit = float(1023);
+  float currentRead = float(analogRead(A6));
+  float voltageRead = float(analogRead(A6));
+  float current = ((currentRead/limit)*5)/33.0;
+  float voltage = (voltageRead/limit)*10;
+  podDataOut.PodPower = voltage*current;       // watts 
+  PodDataOut.PodState = 1;       // if communication or pod is failing, podstate will default to sending 0 
 //#################AS Conductivity########################
   
   
 }
-//#################################################################
-//#################################################################
-//#################################################################
-//#################################################################
 
 //##################  Custom functions #################
 
