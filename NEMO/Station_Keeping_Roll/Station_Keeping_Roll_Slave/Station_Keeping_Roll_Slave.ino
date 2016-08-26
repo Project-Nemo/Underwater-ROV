@@ -65,6 +65,7 @@
 #include <Wire.h>  //i2c library for the digital compass and depth sensor
 #include <Servo.h>
 #include <EasyTransfer.h> // Bill Porter's Easy Transfer Library
+#include <SoftEasyTransfer.h>
 #include <MS5803_14.h> //Library for the MS5803-14BA
 #include <SoftwareSerial.h>
 
@@ -73,9 +74,9 @@
 EasyTransfer ETin, ETout;  //Create the two Easy transfer Objects for
 // Two way communication
 
-// Two way communication between pod and slave
-SoftwareSerial podSerial = SoftwareSerial(7,8);
-EasyTransfer ETin2, ETout2;
+// Two way communication between research pod and slave
+SoftwareSerial podSerial(9, 10);
+SoftEasyTransfer SETin, SETout;
 
 MS_5803 sensor = MS_5803(512);
 
@@ -197,8 +198,8 @@ struct RESEARCH_POD_SEND_DATA {
 //give a name to the group of data
 RECEIVE_DATA_STRUCTURE rxdata;
 SEND_DATA_STRUCTURE txdata;
-RESEARCH_POD_RECEIVE_DATA indata;  // podOut
-RESEARCH_POD_SEND_DATA outdata;     // podIn
+RESEARCH_POD_RECEIVE_DATA podDataIn;  
+RESEARCH_POD_SEND_DATA podDataOut;    
 
 void setup()
 {
@@ -249,8 +250,8 @@ void setup()
 
   podSerial.begin(9600);
   // Begin Serial communication with research pod
-  ETin2.begin(details(indata), &podSerial);
-  ETout2.begin(details(outdata), &podSerial);
+  SETin.begin(details(podDataIn), &podSerial);
+  SETout.begin(details(podDataOut), &podSerial);
 
   powerOnIMU(); // setup the accelerometer and gyroscope
   delay(5000); // wait for imu to be ready
@@ -271,14 +272,13 @@ void setup()
 void loop() {
   // Send the message to the serial port for the ROV Arduino
   ETout.sendData();
-  ETout2.sendData();
+  SETout.sendData();
 
   //Based on Bill Porter's example for the Two Way Easy Transfer Library
   //We will include a loop here to make sure the receive part of the
   //process runs smoothly.
   for (int i = 0; i < 5; i++) {
     ETin.receiveData();
-    ETin2.receiveData();
     // We'll do something properly with the returned data at a later s
     ESCVL.write(rxdata.upLraw);  //Set the ESCVL signal to the defined throttle position.
     ESCVR.write(rxdata.upRraw);  //Set the ESCVR signal to the defined throttle position.
@@ -360,10 +360,12 @@ void loop() {
   //it won't be used at this stage.
 
   txdata.ROVDepth = (MS5803Press - 1013) / 98.1; //ROV depth reading (m)
-  outdata.ROVDepth = 10;
+  podDataOut.ROVDepth = txdata.ROVDepth;
 
-  txdata.PodPower = indata.PodPower;
-  txdata.PodState = indata.PodState;
+  if(SETin.receiveData()){
+    txdata.PodPower = podDataIn.PodPower;
+    txdata.PodState = podDataIn.PodState;
+  }
 
   readIMUData();  
   calculateAccelAndGryoAngles();

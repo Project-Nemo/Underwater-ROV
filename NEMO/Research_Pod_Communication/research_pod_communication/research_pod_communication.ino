@@ -2,8 +2,8 @@
 #include <SoftwareSerial.h> 
 #include <Wire.h>
 
-//EasyTransfer ETpodIn, ETpodOut;
-SoftwareSerial podSerial = SoftwareSerial(7,8);
+////EasyTransfer ETpodIn, ETpodOut;
+//SoftwareSerial podSerial = SoftwareSerial(7,8);
 EasyTransfer ETin, ETout;
 
 struct RESEARCH_POD_RECEIVE_DATA {
@@ -22,10 +22,10 @@ void setup() {
   Wire.begin(); 
   Serial.begin(9600);
   // put your setup code here, to run once:
-  podSerial.begin(9600);
+  //podSerial.begin(9600);
   // Begin Serial communication with research pod
-  ETin.begin(details(indata), &podSerial);
-  ETout.begin(details(outdata), &podSerial);
+  ETin.begin(details(indata), &Serial);
+  ETout.begin(details(outdata), &Serial);
 }
 
 void loop() {
@@ -33,4 +33,5 @@ void loop() {
   ETout.sendData();
   ETin.receiveData();
   Serial.println(indata.ROVDepth);
+  outdata.PodPower = 12;
 }
