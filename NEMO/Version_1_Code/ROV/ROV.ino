@@ -367,17 +367,29 @@ void loop() {
     txdata.PodState = podDataIn.PodState;
   }
 
+  // read acceleration and gyroscope values
   readIMUData();  
-  calculateAccelAndGryoAngles();
+  calculateAccelAndGryoAngles();  
 
-  // TODO sationkeeping code trigger here
-  
+  // trigger station keeping code if throttles on PS2 controller are not being moved
+  // assumes 0 is not moving value.
+  if(isNotControllingROV(rxdata.upLraw, rxdata.upRraw, rxdata.HLraw, rxdata.HRraw, 0)){
+      stationKeepRoll();
+  }
 }
 
 
 void CamRecTrigger() {
   digitalWrite(CamRecTrig, LOW); //Trip the recorder toggle.
   TriggerHoldTm = millis();  //Reset the time that a camera trigger was used.
+}
+
+boolean isNotControllingROV(int VL, int VR, int HL, int HR, int desired){
+  // high is upper limit, and low is lower (checks if values +/- bound of desired value)
+  int bound = 2;
+  int high = desired + bound;
+  int low = desired - bound;
+  return low <= VL && VL <= high && low <= VR && VR <= high && low <= HL && HL <= high && low <= HR && HR <= high;
 }
 
 void powerOnIMU() {
