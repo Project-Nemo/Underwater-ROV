@@ -44,7 +44,7 @@ struct RESEARCH_POD_SEND_DATA {
 };
 
 struct RESEARCH_POD_RECEIVE_DATA {
-  int ROVDepth;  // ROV depth reading
+  int ROVPressure;  // ROV depth reading
 };
 
 RESEARCH_POD_RECEIVE_DATA podDataIn;  
@@ -152,8 +152,8 @@ void loop() {
     {
       String dataString = "";
       if(SETin.receiveData()){
-        //dataString += String("DEPTH: ");
-        dataString += String(podDataIn.ROVDepth);
+        //dataString += String("Pressure: ");
+        dataString += String(podDataIn.ROVPressure);
       }
             
       //dataString += String("UV:, ");

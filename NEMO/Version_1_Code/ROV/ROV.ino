@@ -192,7 +192,7 @@ struct RESEARCH_POD_RECEIVE_DATA {
 };
 
 struct RESEARCH_POD_SEND_DATA {
-  int ROVDepth;  // ROV depth reading
+  int ROVPressure;  // ROV depth reading
 };
 
 //give a name to the group of data
@@ -360,7 +360,7 @@ void loop() {
   //it won't be used at this stage.
 
   txdata.ROVDepth = (MS5803Press - 1013) / 98.1; //ROV depth reading (m)
-  podDataOut.ROVDepth = txdata.ROVDepth;
+  podDataOut.ROVPressure = MS5803Press;
 
   if(SETin.receiveData()){
     txdata.PodPower = podDataIn.PodPower;
