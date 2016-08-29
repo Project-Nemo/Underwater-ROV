@@ -192,7 +192,7 @@ struct RESEARCH_POD_RECEIVE_DATA {
 };
 
 struct RESEARCH_POD_SEND_DATA {
-  int ROVDepth;  // ROV depth reading
+  int ROVPressure;  // ROV depth reading
 };
 
 //give a name to the group of data
@@ -360,27 +360,36 @@ void loop() {
   //it won't be used at this stage.
 
   txdata.ROVDepth = (MS5803Press - 1013) / 98.1; //ROV depth reading (m)
-  podDataOut.ROVDepth = txdata.ROVDepth;
+  podDataOut.ROVPressure = MS5803Press;
 
   if(SETin.receiveData()){
     txdata.PodPower = podDataIn.PodPower;
     txdata.PodState = podDataIn.PodState;
   }
 
-  Serial.println("PODPOWER");
-  Serial.println(indata.PodPower);
-
+  // read acceleration and gyroscope values
   readIMUData();  
-  calculateAccelAndGryoAngles();
+  calculateAccelAndGryoAngles();  
 
-  // TODO sationkeeping code trigger here
-  
+  // trigger station keeping code if throttles on PS2 controller are not being moved
+  // assumes 0 is not moving value.
+  if(isNotControllingROV(rxdata.upLraw, rxdata.upRraw, rxdata.HLraw, rxdata.HRraw, 0)){
+      stationKeepRoll();
+  }
 }
 
 
 void CamRecTrigger() {
   digitalWrite(CamRecTrig, LOW); //Trip the recorder toggle.
   TriggerHoldTm = millis();  //Reset the time that a camera trigger was used.
+}
+
+boolean isNotControllingROV(int VL, int VR, int HL, int HR, int desired){
+  // high is upper limit, and low is lower (checks if values +/- bound of desired value)
+  int bound = 2;
+  int high = desired + bound;
+  int low = desired - bound;
+  return low <= VL && VL <= high && low <= VR && VR <= high && low <= HL && HL <= high && low <= HR && HR <= high;
 }
 
 void powerOnIMU() {
@@ -566,27 +575,12 @@ void calculateAccelAndGryoAngles() {
   float gyro_y = (gyData[valueIndex])/FS_SEL;
   float gyro_z = (gzData[valueIndex])/FS_SEL;
   
-  Serial.println(F(""));
-  Serial.print(F("GYRO RAW: "));
-  Serial.print(gyro_x, 2);
-  Serial.print(F(", "));
-  Serial.print(gyro_y, 2);
-  Serial.print(F(", "));
-  Serial.println(gyro_z, 2);
   
   // Get raw acceleration values
   // float G_CONVERT = 16384;
   float accel_x = axData[valueIndex];
   float accel_y = ayData[valueIndex];
   float accel_z = azData[valueIndex];
-  
-  Serial.println(F(""));
-  Serial.print(F("ACCEL RAW: "));
-  Serial.print(accel_x, 2);
-  Serial.print(F(", "));
-  Serial.print(accel_y, 2);
-  Serial.print(F(", "));
-  Serial.println(accel_z, 2);
   
   // Get angle values from accelerometer
   float RADIANS_TO_DEGREES = 180/3.14159;
@@ -617,27 +611,27 @@ void calculateAccelAndGryoAngles() {
   setLastReadAngle(t_now, angle_x, angle_y, angle_z, unfiltered_gyro_angle_x, unfiltered_gyro_angle_y, unfiltered_gyro_angle_z);
   
   // Send the data to the serial port
-  Serial.println(F(""));
   Serial.print(F("DEL:"));              //Delta T
-  Serial.println(dt, DEC);
+  Serial.print(dt, DEC);
   Serial.print(F("#ACC:"));              //Accelerometer angle
   Serial.print(accel_angle_x, 2);
   Serial.print(F(","));
   Serial.print(accel_angle_y, 2);
   Serial.print(F(","));
-  Serial.println(accel_angle_z, 2);
+  Serial.print(accel_angle_z, 2);
   Serial.print(F("#GYR:"));
   Serial.print(unfiltered_gyro_angle_x, 2);        //Gyroscope angle
   Serial.print(F(","));
   Serial.print(unfiltered_gyro_angle_y, 2);
   Serial.print(F(","));
-  Serial.println(unfiltered_gyro_angle_z, 2);
+  Serial.print(unfiltered_gyro_angle_z, 2);
   Serial.print(F("#FIL:"));             //Filtered angle
   Serial.print(angle_x, 2);
   Serial.print(F(","));
   Serial.print(angle_y, 2);
   Serial.print(F(","));
   Serial.print(angle_z, 2);
+  Serial.println(F(""));
   
   // Delay so we don't swamp the serial port
   delay(5);

@@ -2,7 +2,7 @@
 //#include <SoftwareSerial.h> 
 #include <Wire.h>
 
-//EasyTransfer ETpodIn, ETpodOut;
+////EasyTransfer ETpodIn, ETpodOut;
 //SoftwareSerial podSerial = SoftwareSerial(7,8);
 EasyTransfer ETin, ETout;
 
