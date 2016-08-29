@@ -365,6 +365,9 @@ void loop() {
   txdata.PodPower = indata.PodPower;
   txdata.PodState = indata.PodState;
 
+  Serial.println("PODPOWER");
+  Serial.println(indata.PodPower);
+
   readIMUData();  
   calculateAccelAndGryoAngles();
 
@@ -561,12 +564,27 @@ void calculateAccelAndGryoAngles() {
   float gyro_y = (gyData[valueIndex])/FS_SEL;
   float gyro_z = (gzData[valueIndex])/FS_SEL;
   
+  Serial.println(F(""));
+  Serial.print(F("GYRO RAW: "));
+  Serial.print(gyro_x, 2);
+  Serial.print(F(", "));
+  Serial.print(gyro_y, 2);
+  Serial.print(F(", "));
+  Serial.println(gyro_z, 2);
   
   // Get raw acceleration values
   // float G_CONVERT = 16384;
   float accel_x = axData[valueIndex];
   float accel_y = ayData[valueIndex];
   float accel_z = azData[valueIndex];
+  
+  Serial.println(F(""));
+  Serial.print(F("ACCEL RAW: "));
+  Serial.print(accel_x, 2);
+  Serial.print(F(", "));
+  Serial.print(accel_y, 2);
+  Serial.print(F(", "));
+  Serial.println(accel_z, 2);
   
   // Get angle values from accelerometer
   float RADIANS_TO_DEGREES = 180/3.14159;
@@ -597,27 +615,27 @@ void calculateAccelAndGryoAngles() {
   setLastReadAngle(t_now, angle_x, angle_y, angle_z, unfiltered_gyro_angle_x, unfiltered_gyro_angle_y, unfiltered_gyro_angle_z);
   
   // Send the data to the serial port
+  Serial.println(F(""));
   Serial.print(F("DEL:"));              //Delta T
-  Serial.print(dt, DEC);
+  Serial.println(dt, DEC);
   Serial.print(F("#ACC:"));              //Accelerometer angle
   Serial.print(accel_angle_x, 2);
   Serial.print(F(","));
   Serial.print(accel_angle_y, 2);
   Serial.print(F(","));
-  Serial.print(accel_angle_z, 2);
+  Serial.println(accel_angle_z, 2);
   Serial.print(F("#GYR:"));
   Serial.print(unfiltered_gyro_angle_x, 2);        //Gyroscope angle
   Serial.print(F(","));
   Serial.print(unfiltered_gyro_angle_y, 2);
   Serial.print(F(","));
-  Serial.print(unfiltered_gyro_angle_z, 2);
+  Serial.println(unfiltered_gyro_angle_z, 2);
   Serial.print(F("#FIL:"));             //Filtered angle
   Serial.print(angle_x, 2);
   Serial.print(F(","));
   Serial.print(angle_y, 2);
   Serial.print(F(","));
   Serial.print(angle_z, 2);
-  Serial.println(F(""));
   
   // Delay so we don't swamp the serial port
   delay(5);
