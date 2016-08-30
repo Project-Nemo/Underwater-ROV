@@ -68,6 +68,7 @@
 #include <SoftEasyTransfer.h>
 #include <MS5803_14.h> //Library for the MS5803-14BA
 #include <SoftwareSerial.h>
+#include <ACCEL_GYRO_KALMAN.h>
 
 #define DATA_LENGTH 10
 
@@ -86,6 +87,11 @@ Servo ESCHL;  // Create Servo Object ESC Horizontal Left
 Servo ESCHR;  // Create Servo Object ESC Horizontal Right
 Servo CamAng; // Create Servo Object for the Camera Pitch Servo.
 
+GYRO gyroscope;
+ACCEL accelerometer;
+float accPitch = 0;
+float accRoll = 0;
+
 const int RedLEDpin = 13; // The indicator LED pin is 13.
 const int HeadLts = 12; // The Headlight Control is on pin 12
 const int CamRecTrig = 3; //Camera video recorder trigger is on pin D3
@@ -95,15 +101,6 @@ const int hmc5883Address = 0x1E; //0011110b, I2C 7bit address for compass
 const byte hmc5883ModeRegister = 0x02;
 const byte hmcContinuousMode = 0x00;
 const byte hmcDataOutputXMSBAddress = 0x03;
-
-const byte gyro_ctrl_reg1 = 0x20;
-const byte gyro_ctrl_reg2 = 0x21;
-const byte gyro_ctrl_reg3 = 0x22;
-const byte gyro_address = 0x69;   // Gryo device address
-
-// for acc
-const byte acc_ctrl_reg = 0x2d;
-const byte acc_address = 0x53;  // ADXL345 device address
 
 volatile boolean CamRecd;  //Camera record function toggle
 volatile boolean CamPhoto;  //Camera photo function toggle
@@ -115,36 +112,6 @@ const int Temppin = A6; // analogue pin used to read the TMP36 Temp sensor
 int volts;    // variable to read the voltage from the analog pin
 int x, y, z; //triple axis data for the digital compass.
 int angle; //calculated horizontal heading angle.
-
-// variables for storing accelerometer values
-int ax, ay, az;
-// variables for storing gryoscope values
-int gx, gy, gz;
-
-// Overall rotation values (for stable readings)
-unsigned long last_read_time;
-float         last_x_angle;  // These are the filtered angles
-float         last_y_angle;
-float         last_z_angle;  
-float         last_gyro_x_angle;  // Store the gyro angles to compare drift
-float         last_gyro_y_angle;
-float         last_gyro_z_angle;
-
-// IMU data arrays to allow moving averages to be calculated
-int axData[DATA_LENGTH];
-int ayData[DATA_LENGTH];
-int azData[DATA_LENGTH];
-int gxData[DATA_LENGTH];
-int gyData[DATA_LENGTH];
-int gzData[DATA_LENGTH];
-
-//  Base accel and gryo values for calibration offset
-float    base_x_accel;
-float    base_y_accel;
-float    base_z_accel;
-float    base_x_gyro;
-float    base_y_gyro;
-float    base_z_gyro;
 
 // station keeping variables for PID
 double oldAngle = 0, angSum = 0, PID = 0;      // PID variables
@@ -182,6 +149,8 @@ struct SEND_DATA_STRUCTURE {
   int GyroX;
   int GyroY;
   int GyroZ;
+  int AccRoll;
+  int AccPitch;
   int PodPower;   // power of pod in watts
   int PodState;   // 1 if functioning correctly, 0 otherwise
 };
@@ -253,10 +222,7 @@ void setup()
   SETin.begin(details(podDataIn), &podSerial);
   SETout.begin(details(podDataOut), &podSerial);
 
-  powerOnIMU(); // setup the accelerometer and gyroscope
-  delay(5000); // wait for imu to be ready
-  calibrateSensors();
-  setLastReadAngle(millis(), 0, 0, 0, 0, 0, 0);
+  initialise_IMU(); // setup the accelerometer and gyroscope
 
   //The camera starts in record mode probably due to Arduino startup signals
   //and so this needs to be stopped.  The sequence below sends a toggle to
@@ -368,8 +334,7 @@ void loop() {
   }
 
   // read acceleration and gyroscope values
-  readIMUData();  
-  calculateAccelAndGryoAngles();  
+  read_IMU();
 
   // trigger station keeping code if throttles on PS2 controller are not being moved
   // assumes 0 is not moving value.
@@ -392,93 +357,21 @@ boolean isNotControllingROV(int VL, int VR, int HL, int HR, int desired){
   return low <= VL && VL <= high && low <= VR && VR <= high && low <= HL && HL <= high && low <= HR && HR <= high;
 }
 
-void powerOnIMU() {
-  //Turning on the accelerometer
-  writeRegister(acc_address, acc_ctrl_reg, 0);
-  writeRegister(acc_address, acc_ctrl_reg, 16);
-  writeRegister(acc_address, acc_ctrl_reg, 8);
-  //Turning on the gyroscope
-  writeRegister(gyro_address, gyro_ctrl_reg1, 15);
-  writeRegister(gyro_address, gyro_ctrl_reg2, 0);
-  writeRegister(gyro_address, gyro_ctrl_reg3, 8);
-}
-
-void getAccValues() {
-
-  byte xMSB = readRegister(acc_address, 0x33); //51
-  byte xLSB = readRegister(acc_address, 0x32); //50
-  ax = ((xMSB << 8) | xLSB);
-
-  byte yMSB = readRegister(acc_address, 0x35); //53
-  byte yLSB = readRegister(acc_address, 0x34); //52
-  ay = ((yMSB << 8) | yLSB);
-
-  byte zMSB = readRegister(acc_address, 0x37); //55
-  byte zLSB = readRegister(acc_address, 0x36); //54
-  az = ((zMSB << 8) | zLSB);
-}
-
-void getGyroValues() {
-
-  byte xMSB = readRegister(gyro_address, 0x29); //41
-  byte xLSB = readRegister(gyro_address, 0x28); //40
-  gx = ((xMSB << 8) | xLSB);
-
-  byte yMSB = readRegister(gyro_address, 0x2B); //43
-  byte yLSB = readRegister(gyro_address, 0x2A); //42
-  gy = ((yMSB << 8) | yLSB);
-
-  byte zMSB = readRegister(gyro_address, 0x2D); //45
-  byte zLSB = readRegister(gyro_address, 0x2C); //44
-  gz = ((zMSB << 8) | zLSB);
-}
-
-void writeRegister(int deviceAddress, byte address, byte val) {
-  Wire.beginTransmission(deviceAddress); // start transmission to device
-  Wire.write(address);       // send register address
-  Wire.write(val);         // send value to write
-  Wire.endTransmission();     // end transmission
-}
-
-int readRegister(int deviceAddress, byte address) {
-
-  int v;
-  Wire.beginTransmission(deviceAddress);
-  Wire.write(address); // register to read
-  Wire.endTransmission();
-
-  Wire.requestFrom(deviceAddress, 1); // read a byte
-
-  while (!Wire.available()) {
-    // waiting
+void initialise_IMU() {
+  // Initialize ADXL345
+  while(!accelerometer.begin()){
+    delay(500);
   }
-
-  v = Wire.read();
-  return v;
-}
-
-void readIMUData() {
-  getAccValues();   // read the accelerometer values
-  getGyroValues();  // read the gyroscope values
-
-  // caluclate moving average values and send them to master
-  txdata.AccX = movingAverage(axData, ax - base_x_accel);
-  txdata.AccY = movingAverage(ayData, ay - base_y_accel);
-  txdata.AccZ = movingAverage(azData, az - base_z_accel);
-  txdata.GyroX = movingAverage(gxData, gx - last_gyro_x_angle);
-  txdata.GyroY = movingAverage(gyData, gy - last_gyro_y_angle);
-  txdata.GyroZ = movingAverage(gzData, gz - last_gyro_z_angle);
-}
-
-double movingAverage(int data[], int newVal) {
-  double total = 0;
-  for (int i = 1; i < DATA_LENGTH; i++) {
-    data[i - 1] = data[i];
-    total = total + data[i - 1];
+  // Initialize L3G4200D
+  while(!gyroscope.begin(SCALE_250DPS, DATARATE_400HZ_50)){
+    delay(500);
   }
-  data[DATA_LENGTH - 1] = newVal;
-  total = total + newVal;
-  return total / DATA_LENGTH;;
+  
+  Serial.println("Begin Calibration");
+  // Must call calibrate twice because for some reason, once doesn't work
+  gyroscope.calibrate(250);
+  gyroscope.calibrate(250);
+  Serial.println("Finish Calibration");
 }
 
   //    - <- -> +
@@ -515,124 +408,40 @@ void stationKeepRoll() {
    ESCVR.write(rightVal);  
 }
 
-void calibrateSensors() {  
-  Serial.println("Starting Calibration"); 
-  
-  // Read and average the raw values from the IMU
-  for (int i = 0; i < DATA_LENGTH; i++) {
-    getAccValues();   
-    getGyroValues();
-    axData[i] = ax;
-    ayData[i] = ay;
-    azData[i] = az;
-    gxData[i] = gx;
-    gyData[i] = gy;
-    gzData[i] = gz;
-    delay(100);
-  }
+void read_IMU(){
+  Vector acc = accelerometer.read_normalised();
+  Vector gyr = gyroscope.read_normalised();
 
-  // Discard the first set of values read from the IMU
-  getAccValues();   
-  getGyroValues();
-  axData[0] = ax;
-  ayData[0] = ay;
-  azData[0] = az;
-  gxData[0] = gx;
-  gyData[0] = gy;
-  gzData[0] = gz;
-    
-  // Store the raw calibration values globally
-  base_x_accel = movingAverage(axData, ax);
-  base_y_accel = movingAverage(ayData, ay);
-  base_z_accel = movingAverage(azData, az);
-  base_x_gyro = movingAverage(gxData, gx);
-  base_y_gyro = movingAverage(gyData, gy);
-  base_z_gyro = movingAverage(gzData, gz);
-  
-  Serial.println("Finished Calibration");
+  // Calculate Pitch & Roll from accelerometer (deg)
+  accRoll = (atan2(acc.x_axis, sqrt(acc.y_axis*acc.y_axis + acc.z_axis*acc.z_axis))*180.0)/M_PI;
+  accPitch  = -(atan2(acc.y_axis, acc.z_axis)*180.0)/M_PI;
+
+  txdata.AccX = acc.x_axis;
+  txdata.AccY = acc.y_axis;
+  txdata.AccZ = acc.z_axis;
+  txdata.GyroX = gyr.x_axis;
+  txdata.GyroY = gyr.y_axis;
+  txdata.GyroZ = gyr.z_axis;
+  txdata.AccRoll = accRoll;
+  txdata.AccPitch = accPitch;
+
+  Serial.println("");
+  Serial.print("Accel Pitch: ");
+  Serial.println(accPitch);
+  Serial.print("Accel Roll: ");
+  Serial.println(accRoll);
+  Serial.print("Acc: ");
+  Serial.print(acc.x_axis);
+  Serial.print(", ");
+  Serial.print(acc.y_axis);
+  Serial.print(", ");
+  Serial.println(acc.z_axis);
+  Serial.print("Gyro: ");
+  Serial.print(gyr.x_axis);
+  Serial.print(", ");
+  Serial.print(gyr.y_axis);
+  Serial.print(", ");
+  Serial.println(gyr.z_axis);
+  Serial.println("");
 }
 
-void setLastReadAngle(unsigned long time, float x, float y, float z, float x_gyro, float y_gyro, float z_gyro) {
-  last_read_time = time;
-  last_x_angle = x;
-  last_y_angle = y;
-  last_z_angle = z;
-  last_gyro_x_angle = x_gyro;
-  last_gyro_y_angle = y_gyro;
-  last_gyro_z_angle = z_gyro;
-}
-
-void calculateAccelAndGryoAngles() {
-  int error;
-  double dT;
-  int valueIndex = DATA_LENGTH - 1;
-  
-  // Get the time of reading for rotation computations
-  unsigned long t_now = millis();
-
-  float FS_SEL = 131;
-  float gyro_x = (gxData[valueIndex])/FS_SEL;
-  float gyro_y = (gyData[valueIndex])/FS_SEL;
-  float gyro_z = (gzData[valueIndex])/FS_SEL;
-  
-  
-  // Get raw acceleration values
-  // float G_CONVERT = 16384;
-  float accel_x = axData[valueIndex];
-  float accel_y = ayData[valueIndex];
-  float accel_z = azData[valueIndex];
-  
-  // Get angle values from accelerometer
-  float RADIANS_TO_DEGREES = 180/3.14159;
-  //  float accel_vector_length = sqrt(pow(accel_x,2) + pow(accel_y,2) + pow(accel_z,2));
-  float accel_angle_y = atan(-1*accel_x/sqrt(pow(accel_y,2) + pow(accel_z,2)))*RADIANS_TO_DEGREES;
-  float accel_angle_x = atan(accel_y/sqrt(pow(accel_x,2) + pow(accel_z,2)))*RADIANS_TO_DEGREES;
-  float accel_angle_z = 0;
-  
-  // Compute the (filtered) gyro angles
-  float dt =(t_now - last_read_time)/1000.0;
-  float gyro_angle_x = gyro_x*dt + last_x_angle;
-  float gyro_angle_y = gyro_y*dt + last_y_angle;
-  float gyro_angle_z = gyro_z*dt + last_z_angle;
-  
-  // Compute the drifting gyro angles
-  float unfiltered_gyro_angle_x = gyro_x*dt + last_gyro_x_angle;
-  float unfiltered_gyro_angle_y = gyro_y*dt + last_gyro_y_angle;
-  float unfiltered_gyro_angle_z = gyro_z*dt + last_gyro_z_angle;
-  
-  // Apply the complementary filter to figure out the change in angle - choice of alpha is
-  // estimated now.  Alpha depends on the sampling rate...
-  float alpha = 0.96;
-  float angle_x = alpha*gyro_angle_x + (1.0 - alpha)*accel_angle_x;
-  float angle_y = alpha*gyro_angle_y + (1.0 - alpha)*accel_angle_y;
-  float angle_z = gyro_angle_z;  //Accelerometer doesn't give z-angle
-  
-  // Update the saved data with the latest values
-  setLastReadAngle(t_now, angle_x, angle_y, angle_z, unfiltered_gyro_angle_x, unfiltered_gyro_angle_y, unfiltered_gyro_angle_z);
-  
-  // Send the data to the serial port
-  Serial.print(F("DEL:"));              //Delta T
-  Serial.print(dt, DEC);
-  Serial.print(F("#ACC:"));              //Accelerometer angle
-  Serial.print(accel_angle_x, 2);
-  Serial.print(F(","));
-  Serial.print(accel_angle_y, 2);
-  Serial.print(F(","));
-  Serial.print(accel_angle_z, 2);
-  Serial.print(F("#GYR:"));
-  Serial.print(unfiltered_gyro_angle_x, 2);        //Gyroscope angle
-  Serial.print(F(","));
-  Serial.print(unfiltered_gyro_angle_y, 2);
-  Serial.print(F(","));
-  Serial.print(unfiltered_gyro_angle_z, 2);
-  Serial.print(F("#FIL:"));             //Filtered angle
-  Serial.print(angle_x, 2);
-  Serial.print(F(","));
-  Serial.print(angle_y, 2);
-  Serial.print(F(","));
-  Serial.print(angle_z, 2);
-  Serial.println(F(""));
-  
-  // Delay so we don't swamp the serial port
-  delay(5);
-}

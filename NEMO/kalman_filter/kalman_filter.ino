@@ -30,6 +30,7 @@ void setup()
   }
   
   Serial.println("Begin Calibration");
+  // Must call calibrate twice because for some reason, once doesn't work
   gyroscope.calibrate(250);
   gyroscope.calibrate(250);
   Serial.println("Finish Calibration");
@@ -41,8 +42,8 @@ void loop()
   Vector gyr = gyroscope.read_normalised();
 
   // Calculate Pitch & Roll from accelerometer (deg)
-  accPitch = -(atan2(acc.x_axis, sqrt(acc.y_axis*acc.y_axis + acc.z_axis*acc.z_axis))*180.0)/M_PI;
-  accRoll  = (atan2(acc.y_axis, acc.z_axis)*180.0)/M_PI;
+  accRoll = (atan2(acc.x_axis, sqrt(acc.y_axis*acc.y_axis + acc.z_axis*acc.z_axis))*180.0)/M_PI;
+  accPitch  = -(atan2(acc.y_axis, acc.z_axis)*180.0)/M_PI;
 
   Serial.println("");
   Serial.print("Accel Pitch: ");
