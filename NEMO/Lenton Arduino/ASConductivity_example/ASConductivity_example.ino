@@ -37,6 +37,14 @@ void serialEvent() {                                  //if the hardware serial p
 
 
 void loop() {                                         //here we go...
+  
+  if(Serial.available() >1){    
+    String command;
+    command = Serial.readString();
+    myserial.print(command); 
+    Serial.println("command:");
+    Serial.print(command);
+  }
 
   if (input_string_complete) {                        //if a string from the PC has been received in its entirety
     myserial.print(inputstring);                      //send that string to the Atlas Scientific product

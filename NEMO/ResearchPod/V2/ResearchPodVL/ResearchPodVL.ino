@@ -1,11 +1,13 @@
-
 #include <SPI.h>
 #include <SD.h>
 #include <Wire.h>
-#include <SoftEasyTransfer.h>
+#include <EasyTransfer.h>
 #include <BH1750.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <SoftwareSerial.h>    //we have to include the SoftwareSerial library, or else we can't use it
+
+
 #define ONE_WIRE_BUS_1 4
 
 //Hardware pin definitions
@@ -16,10 +18,10 @@
 #define chipSelect 10 //SPI Chip select pin
 
 //#################AS Conductivity##############################
-#include <SoftwareSerial.h>                           //we have to include the SoftwareSerial library, or else we can't use it
-#define rx 8                                          //define what pin rx is going to be
-#define tx 9                                          //define what pin tx is going to be
-SoftwareSerial myserial(rx, tx);                      //define how the soft serial port is going to work
+                       
+#define rx 2                                          //define what pin rx is going to be for conductivity
+#define tx 3                                          //define what pin tx is going to be  for conductivity
+SoftwareSerial conductivitySerial(rx, tx);            //define how the soft serial port is going to communicate with condiuctivity sensor Micro
 String inputstring = "";                              //a string to hold incoming data from the PC
 String sensorstring = "";                             //a string to hold the data from the Atlas Scientific product
 boolean input_string_complete = false;                //have we received all the data from the PC
@@ -35,8 +37,8 @@ OneWire oneWire_in(ONE_WIRE_BUS_1);
 DallasTemperature tempSensor(&oneWire_in);
 
 //##################Communcation############################
-SoftwareSerial podSerial(0, 1);
-SoftEasyTransfer SETin, SETout;
+//SoftwareSerial podSerial(4, 5);
+EasyTransfer SETin, SETout;
 
 struct RESEARCH_POD_SEND_DATA {
   int PodPower;       // watts 
@@ -47,8 +49,8 @@ struct RESEARCH_POD_RECEIVE_DATA {
   int ROVPressure;  // ROV depth reading
 };
 
-RESEARCH_POD_RECEIVE_DATA podDataIn;  
-RESEARCH_POD_SEND_DATA podDataOut;   
+RESEARCH_POD_RECEIVE_DATA podDataIn;
+RESEARCH_POD_SEND_DATA podDataOut; 
 
 //##########################################################
 
@@ -57,30 +59,27 @@ void setup() {
    // Open serial communications and wait for port to open:
   Serial.begin(9600);
   Wire.begin();               //begin I2C
-  myserial.begin(9600);       //set baud rate for the software serial port to 9600 for AS CS
+  //podSerial.begin(9600);
+  conductivitySerial.begin(9600);       //set baud rate for the software serial port to 9600 for AS CS
   inputstring.reserve(10);    //set aside some bytes for receiving data from the PC
   sensorstring.reserve(30);   //set aside some bytes for receiving data from Atlas Scientific product
   tempSensor.begin();
 
-  podSerial.begin(9600);
-  SETin.begin(details(podDataIn), &podSerial); 
-  SETout.begin(details(podDataOut), &podSerial); 
+  //podSerial.begin(9600);
+  SETin.begin(details(podDataIn), &Serial);
+  SETout.begin(details(podDataOut), &Serial);
   
-  while (!Serial) {
-    ; // wait for serial port to connect. Needed for native USB port only
-  }
-
 
   //###################################################
   //             SD Card Initializing Code
-  Serial.println("Initializing SD card...");
+  //Serial.println("Initializing SD card...");
   
   // see if the card is present and can be initialized:
   if (!SD.begin(chipSelect)) {
-    Serial.println("Card failed, or not present");
+    //Serial.println("Card failed, or not present");
     sdCardAvailable = false;
   } else {
-    Serial.println("card initialized.");
+    //Serial.println("card initialized.");
     sdCardAvailable = true;
     int dataNumber = 0;
     fileName = "data" + String(dataNumber) + ".csv";
@@ -93,33 +92,33 @@ void setup() {
         break;
       }
     }
-    Serial.print("file name to save data is :");
-    Serial.println(fileName);
+    //Serial.print("file name to save data is :");
+    //Serial.println(fileName);
     File SD_file = SD.open(fileName, FILE_WRITE);
         // if the file is available, write to it:
         if (SD_file) {
-          SD_file.println("EC,TSD,SAL,GRAV,UV,LIGHT,Turbidity,Temperature");
-          Serial.println("EC,TSD,SAL,GRAV,UV,LIGHT,Turbidity,Temperature");
+          SD_file.println("Pressure,UV,LIGHT,Turbidity,Temperature,EC,TSD,SAL,GRAV");
+          //Serial.println("Pressure,UV,LIGHT,Turbidity,Temperature,EC,TSD,SAL,GRAV");
           SD_file.close();
-          Serial.println("write to SD successful");
-        } else
-          Serial.println("Error writing to SD");
+          //Serial.println("write to SD successful");
+        } //else
+          //Serial.println("Error writing to SD");
   }
     
   
 //#####################################################
 //                UV Sensor (ML8511)
-  Serial.print("Initializing ML8511 \n");
+  //Serial.print("Initializing ML8511 \n");
   pinMode(UV_OUT, INPUT);
   pinMode(REF_3V3, INPUT);
-  Serial.print("ML8511 Initialized \n");
+  //Serial.print("ML8511 Initialized \n");
   
 //##################################################### 
 //         Setup Comms with light sensor (GY-30) 
 
-  Serial.print("Initializing GY30 \n");
+ //Serial.print("Initializing GY30 \n");
   lightMeter.begin();
-  Serial.print("GY30 Initialized \n");
+  //Serial.print("GY30 Initialized \n");
 }
 
 
@@ -127,16 +126,32 @@ void setup() {
 
 void loop() {
   SETout.sendData();
+  String dataString = "";
+  
+  // Communicate power and status code
+  float limit = float(1023); //Take from reference pin?
+  float currentRead = float(analogRead(A6));
+  float voltageRead = float(analogRead(A6));
+  float current = ((currentRead/limit)*5)/33.0;
+  float voltage = (voltageRead/limit)*10;
+  podDataOut.PodPower = voltage*current;       // watts 
+  podDataOut.PodState = 1;       // if communication or pod is failing, podstate will default to sending 0 
+  
+  if(SETin.receiveData()){
+    //dataString += String("Pressure: ");
+    dataString += String(podDataIn.ROVPressure);
+  }
+  dataString += ",";
 //#################AS Conductivity########################
   if (input_string_complete) {                        //if a string from the PC has been received in its entirety
-    myserial.print(inputstring);                      //send that string to the Atlas Scientific product
-    myserial.print('\r');                             //add a <CR> to the end of the string
+    conductivitySerial.print(inputstring);                      //send that string to the Atlas Scientific product
+    conductivitySerial.print('\r');                             //add a <CR> to the end of the string
     inputstring = "";                                 //clear the string
     input_string_complete = false;                    //reset the flag used to tell if we have received a completed string from the PC
   }
 
-  if (myserial.available() > 0) {                     //if we see that the Atlas Scientific product has sent a character
-    char inchar = (char)myserial.read();              //get the char we just received
+  if (conductivitySerial.available() > 0) {                     //if we see that the Atlas Scientific product has sent a character
+    char inchar = (char)conductivitySerial.read();              //get the char we just received
     sensorstring += inchar;                           //add the char to the var called sensorstring
     if (inchar == '\r') {                             //if the incoming character is a <CR>
       sensor_string_complete = true;                  //set the flag
@@ -146,62 +161,47 @@ void loop() {
 
   if (sensor_string_complete == true) {               //if a string from the Atlas Scientific product has been received in its entirety
     if (isdigit(sensorstring[0]) == false) {          //if the first character in the string is a digit
-      Serial.println(sensorstring);                   //send that string to the PC's serial monitor
+      //Serial.println(sensorstring);                   //send that string to the PC's serial monitor
     }
     else                                              //if the first character in the string is NOT a digit
     {
-      String dataString = "";
-      if(SETin.receiveData()){
-        //dataString += String("Pressure: ");
-        dataString += String(podDataIn.ROVPressure);
-      }
-            
       //dataString += String("UV:, ");
-      dataString += ",";
       dataString += String(read_UV_Sensor());
       
       //dataString += String(", Light:, ");
       dataString += ",";
-      dataString += String(read_Light_Sensor());
+      dataString += read_Light_Sensor();
       
       //dataString += String(", Turbidity:, ");
       dataString += ",";
-      dataString += String(read_Turbidity_Sensor());
+      dataString += read_Turbidity_Sensor();
       
       tempSensor.requestTemperatures();
       //dataString += String(", Temperature:, ");
       dataString += ",";
-      dataString += String(tempSensor.getTempCByIndex(0));
+      dataString += tempSensor.getTempCByIndex(0);
 
       //dataString += String(", Conductivity_TDS_Salinity_GRAV:,");
-      //dataString += sensorstring;
-      dataString += String("\n");
-      Serial.print(sensorstring);
-      Serial.print(dataString);
+      dataString += sensorstring;
+     // Serial.print(sensorstring);
+     // Serial.print(dataString);
       if(sdCardAvailable){
         File SD_file = SD.open(fileName, FILE_WRITE);
         // if the file is available, write to it:
         if (SD_file) {
           SD_file.println(dataString);
           SD_file.close();
-          Serial.println("write to SD successful");
-        } else
-          Serial.println("Error writing to SD");
-      } else
-          Serial.println("SD card not available");
+          //Serial.println("write to SD successful");
+        } //else
+          //Serial.println("Error writing to SD");
+      } //else
+         // Serial.println("SD card not available");
     }
     sensorstring = "";                                //clear the string
     sensor_string_complete = false;                   //reset the flag used to tell if we have received a completed string from the Atlas Scientific product
   }
 
-  // Communicate power and status code
-  float limit = float(1023);
-  float currentRead = float(analogRead(A6));
-  float voltageRead = float(analogRead(A6));
-  float current = ((currentRead/limit)*5)/33.0;
-  float voltage = (voltageRead/limit)*10;
-  podDataOut.PodPower = voltage*current;       // watts 
-  PodDataOut.PodState = 1;       // if communication or pod is failing, podstate will default to sending 0 
+  
 //#################AS Conductivity########################
   
   
