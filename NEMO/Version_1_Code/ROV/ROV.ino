@@ -151,13 +151,12 @@ struct SEND_DATA_STRUCTURE {
   int GyroZ;
   int AccRoll;
   int AccPitch;
-  int PodPower;   // power of pod in watts
-  int PodState;   // 1 if functioning correctly, 0 otherwise
 };
 
 struct RESEARCH_POD_RECEIVE_DATA {
-  int PodPower;    // watts 
-  int PodState;       // 1 if pod functioning correctly, 0 otherwise
+  String sensorData;
+  int PodPower;
+  int PodState;
 };
 
 struct RESEARCH_POD_SEND_DATA {
@@ -329,8 +328,7 @@ void loop() {
   podDataOut.ROVPressure = MS5803Press;
 
   if(SETin.receiveData()){
-    txdata.PodPower = podDataIn.PodPower;
-    txdata.PodState = podDataIn.PodState;
+    Serial.println(podDataIn.sensorData());
   }
 
   // read acceleration and gyroscope values
@@ -425,23 +423,23 @@ void read_IMU(){
   txdata.AccRoll = accRoll;
   txdata.AccPitch = accPitch;
 
-  Serial.println("");
-  Serial.print("Accel Pitch: ");
-  Serial.println(accPitch);
-  Serial.print("Accel Roll: ");
-  Serial.println(accRoll);
-  Serial.print("Acc: ");
-  Serial.print(acc.x_axis);
-  Serial.print(", ");
-  Serial.print(acc.y_axis);
-  Serial.print(", ");
-  Serial.println(acc.z_axis);
-  Serial.print("Gyro: ");
-  Serial.print(gyr.x_axis);
-  Serial.print(", ");
-  Serial.print(gyr.y_axis);
-  Serial.print(", ");
-  Serial.println(gyr.z_axis);
-  Serial.println("");
+//  Serial.println("");
+//  Serial.print("Accel Pitch: ");
+//  Serial.println(accPitch);
+//  Serial.print("Accel Roll: ");
+//  Serial.println(accRoll);
+//  Serial.print("Acc: ");
+//  Serial.print(acc.x_axis);
+//  Serial.print(", ");
+//  Serial.print(acc.y_axis);
+//  Serial.print(", ");
+//  Serial.println(acc.z_axis);
+//  Serial.print("Gyro: ");
+//  Serial.print(gyr.x_axis);
+//  Serial.print(", ");
+//  Serial.print(gyr.y_axis);
+//  Serial.print(", ");
+//  Serial.println(gyr.z_axis);
+//  Serial.println("");
 }
 

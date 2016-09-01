@@ -7,7 +7,6 @@
 #include <DallasTemperature.h>
 #include <SoftwareSerial.h>    //we have to include the SoftwareSerial library, or else we can't use it
 
-
 #define ONE_WIRE_BUS_1 4
 
 //Hardware pin definitions
@@ -37,38 +36,31 @@ OneWire oneWire_in(ONE_WIRE_BUS_1);
 DallasTemperature tempSensor(&oneWire_in);
 
 //##################Communcation############################
-//SoftwareSerial podSerial(4, 5);
-EasyTransfer SETin, SETout;
-
-struct RESEARCH_POD_SEND_DATA {
-  int PodPower;       // watts 
-  int PodState;       // 1 if pod functioning correctly, 0 otherwise
-};
+EasyTransfer ETin, ETout;
 
 struct RESEARCH_POD_RECEIVE_DATA {
   int ROVPressure;  // ROV depth reading
-};
+} podDataIn;
 
-RESEARCH_POD_RECEIVE_DATA podDataIn;
-RESEARCH_POD_SEND_DATA podDataOut; 
+struct RESEARCH_POD_SEND_DATA {
+  String SensorData; 
+  int PodPower;
+  int PodState;
+} podDataOut;
 
 //##########################################################
 
 void setup() {
-  
-   // Open serial communications and wait for port to open:
+  // Open serial communications and wait for port to open:
   Serial.begin(9600);
   Wire.begin();               //begin I2C
-  //podSerial.begin(9600);
   conductivitySerial.begin(9600);       //set baud rate for the software serial port to 9600 for AS CS
   inputstring.reserve(10);    //set aside some bytes for receiving data from the PC
   sensorstring.reserve(30);   //set aside some bytes for receiving data from Atlas Scientific product
   tempSensor.begin();
 
-  //podSerial.begin(9600);
-  SETin.begin(details(podDataIn), &Serial);
-  SETout.begin(details(podDataOut), &Serial);
-  
+  ETin.begin(details(podDataIn), &Serial);  
+  ETout.begin(details(podDataOut), &Serial); 
 
   //###################################################
   //             SD Card Initializing Code
@@ -125,7 +117,7 @@ void setup() {
 //#################################################################
 
 void loop() {
-  SETout.sendData();
+  ETout.sendData();
   String dataString = "";
   
   // Communicate power and status code
@@ -137,7 +129,7 @@ void loop() {
   podDataOut.PodPower = voltage*current;       // watts 
   podDataOut.PodState = 1;       // if communication or pod is failing, podstate will default to sending 0 
   
-  if(SETin.receiveData()){
+  if(ETin.receiveData()){
     //dataString += String("Pressure: ");
     dataString += String(podDataIn.ROVPressure);
   }
@@ -189,6 +181,7 @@ void loop() {
         File SD_file = SD.open(fileName, FILE_WRITE);
         // if the file is available, write to it:
         if (SD_file) {
+          podDataOut.SensorData = dataString;
           SD_file.println(dataString);
           SD_file.close();
           //Serial.println("write to SD successful");
