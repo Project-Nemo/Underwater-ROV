@@ -1,7 +1,7 @@
 #include <SPI.h>
 #include <SD.h>
 #include <Wire.h>
-#include <EasyTransfer.h>
+#include <SoftEasyTransfer.h>
 #include <BH1750.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
@@ -36,7 +36,8 @@ OneWire oneWire_in(ONE_WIRE_BUS_1);
 DallasTemperature tempSensor(&oneWire_in);
 
 //##################Communcation############################
-EasyTransfer ETin, ETout;
+SoftwareSerial podSerial(7,8);
+SoftEasyTransfer ETin, ETout;
 
 struct RESEARCH_POD_RECEIVE_DATA {
   int ROVPressure;  // ROV depth reading
@@ -59,8 +60,9 @@ void setup() {
   sensorstring.reserve(30);   //set aside some bytes for receiving data from Atlas Scientific product
   tempSensor.begin();
 
-  ETin.begin(details(podDataIn), &Serial);  
-  ETout.begin(details(podDataOut), &Serial); 
+  podSerial.begin(9600);
+  ETin.begin(details(podDataIn), &podSerial);  
+  ETout.begin(details(podDataOut), &podSerial); 
 
   //###################################################
   //             SD Card Initializing Code

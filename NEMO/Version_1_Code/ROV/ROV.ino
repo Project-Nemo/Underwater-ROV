@@ -71,7 +71,6 @@
 #include <ACCEL_GYRO_KALMAN.h>
 
 #define DATA_LENGTH 10
-#define NEUTRAL 90
 
 EasyTransfer ETin, ETout;  //Create the two Easy transfer Objects for
 // Two way communication
@@ -155,7 +154,7 @@ struct SEND_DATA_STRUCTURE {
 };
 
 struct RESEARCH_POD_RECEIVE_DATA {
-  String sensorData;
+  String SensorData;
   int PodPower;
   int PodState;
 };
@@ -209,8 +208,8 @@ void setup()
   Wire.endTransmission();
   // Initialize the MS5803 sensor.
   sensor.initializeMS_5803();
-
-  delay(10000);   //Ten second delay
+  
+  //delay(10000);   //Ten second delay
   //The ESC should now be initialised and ready to run.
 
   Serial.begin(9600); //Begin Serial to talk to the Master Arduino
@@ -222,8 +221,8 @@ void setup()
   SETin.begin(details(podDataIn), &podSerial);
   SETout.begin(details(podDataOut), &podSerial);
 
-  initialise_IMU(); // setup the accelerometer and gyroscope
-
+  //initialise_IMU(); // setup the accelerometer and gyroscope
+  
   //The camera starts in record mode probably due to Arduino startup signals
   //and so this needs to be stopped.  The sequence below sends a toggle to
   //the camera to stop it from recording.  obviously this will leave a small
@@ -232,7 +231,6 @@ void setup()
   digitalWrite(CamRecTrig, LOW); //Trip the photo trigger.
   delay(100);
   digitalWrite(CamRecTrig, HIGH);
-
 }
 
 void loop() {
@@ -329,7 +327,7 @@ void loop() {
   podDataOut.ROVPressure = MS5803Press;
 
   if(SETin.receiveData()){
-    Serial.println(podDataIn.sensorData());
+    Serial.println(podDataIn.SensorData);  // FOR TESTING
   }
 
   // read acceleration and gyroscope values
@@ -338,7 +336,7 @@ void loop() {
   // trigger station keeping code if throttles on PS2 controller are not being moved
   // assumes 0 is not moving value.
   if(isNotControllingROV(rxdata.upLraw, rxdata.upRraw, rxdata.HLraw, rxdata.HRraw, 0)){
-      stationKeepRoll();
+     stationKeepRoll();
   }
 }
 
@@ -389,7 +387,7 @@ void initialise_IMU() {
   // RT = Right Thruster - Vertical
 void stationKeepRoll() {
   // use moving average to avoid reacting to transients
-  double roll = NEUTRAL - txdata.AccRoll;
+  double roll = txdata.GyroY;   
   //  After you've read the angle from 0 (roll)
   angSum += roll;
   PID = cP*roll + cI*angSum + cD*(roll - oldAngle);
@@ -412,13 +410,8 @@ void read_IMU(){
   Vector gyr = gyroscope.read_normalised();
 
   // Calculate Pitch & Roll from accelerometer (deg)
-  // Roll is a value between 0 and 90 where 90 is the 
-  // neutral and 0 is right angle rotate to left and right.
-  // The pitch is negative on one side and positive on the other
-  // depending on the orientation of the IMU
   accRoll = (atan2(acc.x_axis, sqrt(acc.y_axis*acc.y_axis + acc.z_axis*acc.z_axis))*180.0)/M_PI;
   accPitch  = -(atan2(acc.y_axis, acc.z_axis)*180.0)/M_PI;
-
 
   txdata.AccX = acc.x_axis;
   txdata.AccY = acc.y_axis;
