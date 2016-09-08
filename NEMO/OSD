@@ -22,10 +22,11 @@ int linelen = 25;
 int messageLen = 32;
 char message[] = "";
 char saveChar;
-float angle = 0;
+float angledeg = -90.0 ;
+float angle ;
 
 void setup()  {
-  
+
   tv.begin(PAL, W, H);
   tv.delay(500);
   initOverlay();
@@ -33,7 +34,7 @@ void setup()  {
   tv.fill(0);
   drawGraph();
   randomSeed(analogRead(0));
- 
+
 }
 // Initialize ATMega registers for video overlay capability.
 // Must be called after tv.begin().
@@ -57,25 +58,42 @@ ISR(INT0_vect) {
 
 
 void loop() {
-    tv.fill(0);
-    drawGraph();
-    if (angle == 0)
-    {
-      drawLine(centrex, originy, centrex, originy-linelen);
-    }
-    
-    delay(10000);
-    return;
+  angle = angledeg * 180.0 / PI;
+  tv.fill(0);
+  drawGraph();
+  if (angle == 0.0)
+  {
+    drawLine(centrex, originy, centrex, originy - linelen);
   }
-  
+  else if (angle > 0.0)
+  {
+    x = cos(angle) * (double)linelen;
+    y = sin(angle) * (double)linelen;
+    drawLine(centrex, originy, centrex - (int)x, originy - (int)y);
+  }
+
+  else if (angle < 0.0)
+  {
+    x = cos(abs(angle)) * (double)linelen;
+    y = sin(abs(angle)) * (double)linelen;
+    drawLine(centrex, originy, centrex + (int)x, originy - (int)y);
+  }
+  angledeg =angledeg +1.0;
+  if (angledeg > 90.0) {
+    angledeg = -90.0;
+  }
+  delay(3000);
+  return;
+}
+
 
 void drawGraph() {
   tv.draw_line(originx, originy, 120, originy, 1);
-  tv.draw_circle(60,originy,15,WHITE,-1);
+  tv.draw_circle(60, originy, 15, WHITE, -1);
 }
 
-void drawLine(int x0,int y0,int x1,int y1) {
-tv.draw_line(x0, y0, x1, y1, 1);
+void drawLine(int x0, int y0, int x1, int y1) {
+  tv.draw_line(x0, y0, x1, y1, 1);
 }
 
 
