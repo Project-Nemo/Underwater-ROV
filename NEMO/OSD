@@ -1,0 +1,81 @@
+#include <TVout.h>
+#include <video_gen.h>
+
+#include <TVout.h>
+#include <fontALL.h>
+
+
+#define W 136
+#define H 96
+
+TVout tv;
+
+unsigned char originx = 5;
+unsigned char originy = 80;
+unsigned char centrex = 60;
+char s[32];
+unsigned int n = 0;
+int index = 0;
+double x;
+double y;
+int linelen = 25;
+int messageLen = 32;
+char message[] = "";
+char saveChar;
+float angle = 0;
+
+void setup()  {
+  
+  tv.begin(PAL, W, H);
+  tv.delay(500);
+  initOverlay();
+  tv.select_font(font6x8);
+  tv.fill(0);
+  drawGraph();
+  randomSeed(analogRead(0));
+ 
+}
+// Initialize ATMega registers for video overlay capability.
+// Must be called after tv.begin().
+void initOverlay() {
+  TCCR1A = 0;
+  // Enable timer1.  ICES0 is set to 0 for falling edge detection on input capture pin.
+  TCCR1B = _BV(CS10);
+
+  // Enable input capture interrupt
+  TIMSK1 |= _BV(ICIE1);
+
+  // Enable external interrupt INT0 on pin 2 with falling edge.
+  EIMSK = _BV(INT0);
+  EICRA = _BV(ISC01);
+}
+
+// Required to reset the scan line when the vertical sync occurs
+ISR(INT0_vect) {
+  display.scanLine = 0;
+}
+
+
+void loop() {
+    tv.fill(0);
+    drawGraph();
+    if (angle == 0)
+    {
+      drawLine(centrex, originy, centrex, originy-linelen);
+    }
+    
+    delay(10000);
+    return;
+  }
+  
+
+void drawGraph() {
+  tv.draw_line(originx, originy, 120, originy, 1);
+  tv.draw_circle(60,originy,15,WHITE,-1);
+}
+
+void drawLine(int x0,int y0,int x1,int y1) {
+tv.draw_line(x0, y0, x1, y1, 1);
+}
+
+
