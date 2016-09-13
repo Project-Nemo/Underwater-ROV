@@ -57,10 +57,6 @@
   Direction button pad right = Change reading on display
   Triangle = Start/Stop video recording
   Circle = Take photo
-
-
-
-
 */
 
 
@@ -308,5 +304,3 @@ void loop()
   digitalWrite(yelLEDpin, txdata.LEDHdlts); //Light the LED based on headlights status flag
   delay(18);
 }
-
-
