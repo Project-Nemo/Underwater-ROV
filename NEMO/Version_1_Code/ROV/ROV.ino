@@ -151,6 +151,8 @@ struct SEND_DATA_STRUCTURE {
   int GyroZ;
   int AccRoll;
   int AccPitch;
+  int PodPower;
+  int PodState;
 };
 
 struct RESEARCH_POD_RECEIVE_DATA {
@@ -166,8 +168,8 @@ struct RESEARCH_POD_SEND_DATA {
 //give a name to the group of data
 RECEIVE_DATA_STRUCTURE rxdata;
 SEND_DATA_STRUCTURE txdata;
-RESEARCH_POD_RECEIVE_DATA podDataIn;  
-RESEARCH_POD_SEND_DATA podDataOut;    
+RESEARCH_POD_RECEIVE_DATA podDataIn;
+RESEARCH_POD_SEND_DATA podDataOut;
 
 void setup()
 {
@@ -208,7 +210,7 @@ void setup()
   Wire.endTransmission();
   // Initialize the MS5803 sensor.
   sensor.initializeMS_5803();
-  
+
   //delay(10000);   //Ten second delay
   //The ESC should now be initialised and ready to run.
 
@@ -222,7 +224,7 @@ void setup()
   SETout.begin(details(podDataOut), &podSerial);
 
   //initialise_IMU(); // setup the accelerometer and gyroscope
-  
+
   //The camera starts in record mode probably due to Arduino startup signals
   //and so this needs to be stopped.  The sequence below sends a toggle to
   //the camera to stop it from recording.  obviously this will leave a small
@@ -363,7 +365,7 @@ void initialise_IMU() {
   while(!gyroscope.begin(SCALE_250DPS, DATARATE_400HZ_50)){
     delay(500);
   }
-  
+
   Serial.println("Begin Calibration");
   // Must call calibrate twice because for some reason, once doesn't work
   gyroscope.calibrate(250);
@@ -387,22 +389,22 @@ void initialise_IMU() {
   // RT = Right Thruster - Vertical
 void stationKeepRoll() {
   // use moving average to avoid reacting to transients
-  double roll = txdata.GyroY;   
+  double roll = txdata.GyroY;
   //  After you've read the angle from 0 (roll)
   angSum += roll;
   PID = cP*roll + cI*angSum + cD*(roll - oldAngle);
   oldAngle = roll;
-  
+
   //  Output adjustment
   //  <output> -> PIDScale*PID + PIDShift;
-  
+
   int leftVal = PIDScale*PID + PIDShift;   // TODO: NEED TO COME UP WITH APPROPRIATE TRANSFROMATION HERE
   int diff = 90 - leftVal;
   int rightVal = 90 + diff;
-  
+
   // Send values to thruster
-   ESCVL.write(leftVal);   
-   ESCVR.write(rightVal);  
+   ESCVL.write(leftVal);
+   ESCVR.write(rightVal);
 }
 
 void read_IMU(){
@@ -441,4 +443,3 @@ void read_IMU(){
 //  Serial.println(gyr.z_axis);
 //  Serial.println("");
 }
-

@@ -63,6 +63,13 @@
 #include <PS2X_lib.h> // Bill Porter's PS2 Library
 #include <EasyTransfer.h> // Bill Porter's Easy Transfer Library
 #include <LiquidCrystal.h>
+#include <TVout.h>
+#include <video_gen.h>
+#include <TVout.h>
+#include <fontALL.h>
+
+#define W 136          // on screen display width and height
+#define H 96
 
 PS2X ps2x;  //The PS2 Controller Class
 EasyTransfer ETin, ETout;  //Create the two Easy transfer Objects for
@@ -88,6 +95,12 @@ int DispOpt = 0; //Variable to signal which value to show on the display
 long PhotoSignalRunTime = 0; //A variable to carry the time since photo triggered.
 volatile boolean PhotoActive = false;  // A flag to show that the camera signal has been sent.
 
+unsigned char originx = 5;     // start x position for on screen display
+unsigned char originy = 80;    // start y position for on screen display
+unsigned char centrex = 60;
+int linelen = 25;
+float angledeg = -90.0 ;
+
 struct RECEIVE_DATA_STRUCTURE {
   int BattVolt;  //Battery Voltage message from the ROV.
   int ROVTemp; //ROV interior temperature back from the ROV
@@ -101,6 +114,8 @@ struct RECEIVE_DATA_STRUCTURE {
   int GyroX;
   int GyroY;
   int GyroZ;
+  int AccRoll;
+  int AccPitch;
   int PodPower;
   int PodState;
 };
@@ -120,8 +135,7 @@ struct SEND_DATA_STRUCTURE {
 RECEIVE_DATA_STRUCTURE rxdata;
 SEND_DATA_STRUCTURE txdata;
 
-void setup()
-{
+void setup() {
   ps2x.config_gamepad(13, 11, 10, 12, false, false);
   //setup pins and settings: GamePad(clock, command, attention, data, Pressures?, Rumble?)
   //We have disabled the pressure sensitivity and rumble in this instance and
@@ -147,49 +161,49 @@ void setup()
   lcd.setCursor(0, 0); //Move cursor to top left corner
   lcd.print("Ready");
 
+  // setup on screen display
+  tv.begin(PAL, W, H);
+  tv.delay(500);
+  initOverlay();
+  tv.select_font(font6x8);
+  tv.fill(0);
+  drawGraph();      // TODO ???
+  randomSeed(analogRead(0));  // TODO ???
 }
 
-void loop()
-{
+void loop() {
   ps2x.read_gamepad(); //This needs to be called at least once a second
   // to get data from the controller.
-  if (ps2x.Button(PSB_PAD_UP)) //Pressed and held
-  {
+  if (ps2x.Button(PSB_PAD_UP)) { //Pressed and held
     txdata.CamPitch = txdata.CamPitch + 2; //increase the camera pitch
   }
 
-  if (ps2x.ButtonPressed(PSB_PAD_LEFT)) //Pressed
-  {
+  if (ps2x.ButtonPressed(PSB_PAD_LEFT)) { //Pressed
     txdata.LEDHdlts = !txdata.LEDHdlts; //Toggle the LED light flag
   }
 
 
-  if (ps2x.Button(PSB_PAD_DOWN)) //Pressed and Held
-  {
+  if (ps2x.Button(PSB_PAD_DOWN)) { //Pressed and Held
     txdata.CamPitch = txdata.CamPitch - 2; //decrease the camera pitch
   }
   txdata.CamPitch = constrain(txdata.CamPitch, 20, 160); //Constrain the camera pitch
   //to within range servo can handle.
 
-  if (ps2x.Button(PSB_PAD_RIGHT)) //Pressed and Held
-  {
+  if (ps2x.Button(PSB_PAD_RIGHT)) { //Pressed and Held
     DispOpt = DispOpt + 1; //step through the data to display.
-    if (DispOpt == 2) //At the moment there are only two items of
+    if (DispOpt == 2) { //At the moment there are only two items of
       //data to display.  This will need to be changed as extra data is added
-      //This just resets the data to be displayed to the start of the list.
-    {
+      //This just resets the data to be displayed to the start of the list
       DispOpt = 0;
     }
   }
 
-  if (ps2x.ButtonPressed(PSB_GREEN)) //Triangle pressed
-  {
+  if (ps2x.ButtonPressed(PSB_GREEN)) {//Triangle pressed
     txdata.CamRec = !txdata.CamRec; //Toggle the Camera recording Status
   }
 
 
-  if (ps2x.ButtonPressed(PSB_RED)) //Circle pressed
-  {
+  if (ps2x.ButtonPressed(PSB_RED)) { //Circle pressed
     txdata.CamPhotoShot = true;  //Set to indicate photo shot taken.
   }
 
@@ -228,34 +242,27 @@ void loop()
   for (int i = 0; i < 5; i++) {
     ETin.receiveData();
 
-    if (rxdata.BattVolt < LowBatVolts10) //The factor of 10 is included to
+    if (rxdata.BattVolt < LowBatVolts10) { //The factor of 10 is included to
       // match the factor of 10 used in the reported value which is an int multiplied
       //by 10 to give 0.1 precision to the value.  Make sense?
-    {
       digitalWrite(VwarnLEDpin, HIGH); //If the battery voltage too low,
       //trigger the warning LED
-    }
-    else
-    {
+    } else {
       digitalWrite(VwarnLEDpin, LOW); //Otherwise if voltage above the
       //defined low voltage threshhold
       //leave the LED off.
     }
     ROVTMP = (rxdata.ROVTemp * 0.004882814 - 0.5) * 100; //converts the 0-1024
     //data value into temperature.
-    if (ROVTMP > 50)
-    {
+    if (ROVTMP > 50) {
       digitalWrite(TwarnLEDpin, HIGH); //If the Interior temp too high (over 50 degC),
       //trigger the warning LED
-    }
-    else
-    {
+    } else {
       digitalWrite(TwarnLEDpin, LOW); //Otherwise if interior temperature within the
       //acceptable level, leave the LED off.
     }
 
-    if (DispOpt == 1)
-    {
+    if (DispOpt == 1) {
       lcd.clear();  //A nice clean screen with no remnants from previous
       //messages.
       lcd.setCursor(0, 0); //Top left hand corner
@@ -267,9 +274,7 @@ void loop()
       //extra precision from Integer value and then displayed to 1 decimal place.
       lcd.setCursor(11, 1);
       lcd.print(ROVTMP); // Display the ROV temperature
-    }
-    else
-    {
+    } else {
       lcd.clear();  //A nice clean screen with no remnants from previous
       //messages.      lcd.setCursor(0,0); //Top left hand corner
       lcd.print("Depth:");
@@ -279,22 +284,19 @@ void loop()
       lcd.print(rxdata.ROVDepth); //Display ROV depth in metres
       lcd.setCursor(11, 1);
       lcd.print(rxdata.ROVHDG);  //Display ROV heading in degrees.
-
     }
     delay(18);
   }
 
   // Signalling the probable status of the camera using LEDs.
 
-  if (txdata.CamPhotoShot && !PhotoActive)
-  {
+  if (txdata.CamPhotoShot && !PhotoActive) {
     PhotoSignalRunTime = millis();  //Set the start time for the signal
     digitalWrite(grnLEDpin, HIGH);
     PhotoActive = true;  //record that the photo has been triggered
   }
-  if (txdata.CamPhotoShot && PhotoActive && millis() - PhotoSignalRunTime > 2000) //See if the trigger
+  if (txdata.CamPhotoShot && PhotoActive && millis() - PhotoSignalRunTime > 2000) { //See if the trigger
     // signal has been running for two seconds
-  {
     digitalWrite(grnLEDpin, LOW);
     txdata.CamPhotoShot = false; //Set the camera trigger to off
     PhotoActive = false;  // record that the photosignal has finished.
@@ -302,5 +304,66 @@ void loop()
 
   digitalWrite(redLEDpin, txdata.CamRec); //Light the redLED based on camera recording status flag
   digitalWrite(yelLEDpin, txdata.LEDHdlts); //Light the LED based on headlights status flag
+
+  // onscreen display
+  updateOnScreenDisplay();
   delay(18);
+}
+
+// Initialize ATMega registers for video overlay capability.
+// Must be called after tv.begin().
+void initOverlay() {
+  TCCR1A = 0;
+  // Enable timer1.  ICES0 is set to 0 for falling edge detection on input capture pin.
+  TCCR1B = _BV(CS10);
+  // Enable input capture interrupt
+  TIMSK1 |= _BV(ICIE1);
+  // Enable external interrupt INT0 on pin 2 with falling edge.
+  EIMSK = _BV(INT0);
+  EICRA = _BV(ISC01);
+}
+
+// Required to reset the scan line when the vertical sync occurs
+ISR(INT0_vect) {
+  display.scanLine = 0;
+}
+
+void updateOnScreenDisplay(){
+  // write all display code in here
+  // pod battery
+  // rov battery
+  // artifical horizon
+  // if rov battery low, print message
+  // if pod battery low, print message
+  // if temp to high, print message
+}
+
+void drawGraph() {
+  tv.draw_line(originx, originy, 120, originy, 1);
+  tv.draw_circle(60, originy, 15, WHITE, -1);
+}
+
+void drawBattery(){
+  tv.draw_rect(originx,15,10,5,1, -1);
+}
+
+void drawAngle(){
+  double angle = angledeg * 180.0 / PI;
+  tv.fill(0);
+  drawGraph();
+  if (angle == 0.0) {
+    drawLine(centrex, originy, centrex, originy - linelen);
+  } else if (angle > 0.0) {
+    double x = cos(angle) * (double)linelen;
+    double y = sin(angle) * (double)linelen;
+    drawLine(centrex, originy, centrex - (int)x, originy - (int)y);
+  }  else if (angle < 0.0) {
+    double x = cos(abs(angle)) * (double)linelen;
+    double y = sin(abs(angle)) * (double)linelen;
+    drawLine(centrex, originy, centrex + (int)x, originy - (int)y);
+  }
+  angledeg =angledeg +1.0;
+  if (angledeg > 90.0) {
+    angledeg = -90.0;
+  }
 }
