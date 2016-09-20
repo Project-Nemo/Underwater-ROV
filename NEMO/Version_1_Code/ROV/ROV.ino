@@ -70,8 +70,6 @@
 #include <SoftwareSerial.h>
 #include <ACCEL_GYRO_KALMAN.h>
 
-#define DATA_LENGTH 10
-
 EasyTransfer ETin, ETout;  //Create the two Easy transfer Objects for
 // Two way communication
 
@@ -116,7 +114,7 @@ int angle; //calculated horizontal heading angle.
 // station keeping variables for PID
 double oldAngle = 0, angSum = 0, PID = 0;      // PID variables
 double cP = 1, cI = 1, cD = 1;                 // PID constants
-double PIDScale = 1, PIDShift = 0;             // output scaling
+double PIDScale = 0, PIDShift = 0;             // output scaling
 
 float MS5803Press;  //Pressure from the MS5803 Sensor.
 float MS5803Temp;  //Temperature from the MS5803 Sensor.
@@ -211,7 +209,7 @@ void setup()
   // Initialize the MS5803 sensor.
   sensor.initializeMS_5803();
 
-  //delay(10000);   //Ten second delay
+  delay(10000);   //Ten second delay
   //The ESC should now be initialised and ready to run.
 
   Serial.begin(9600); //Begin Serial to talk to the Master Arduino
@@ -223,7 +221,7 @@ void setup()
   SETin.begin(details(podDataIn), &podSerial);
   SETout.begin(details(podDataOut), &podSerial);
 
-  //initialise_IMU(); // setup the accelerometer and gyroscope
+  initialise_IMU(); // setup the accelerometer and gyroscope
 
   //The camera starts in record mode probably due to Arduino startup signals
   //and so this needs to be stopped.  The sequence below sends a toggle to
@@ -233,6 +231,7 @@ void setup()
   digitalWrite(CamRecTrig, LOW); //Trip the photo trigger.
   delay(100);
   digitalWrite(CamRecTrig, HIGH);
+  Serial.println("Hello");
 }
 
 void loop() {
@@ -340,6 +339,47 @@ void loop() {
   if(isNotControllingROV(rxdata.upLraw, rxdata.upRraw, rxdata.HLraw, rxdata.HRraw, 0)){
      stationKeepRoll();
   }
+
+  // adjust PID values
+  if (Serial.available()) {
+    char ch = Serial.read();
+    if (ch == 'x') {
+      changeParams();
+    }
+  }
+}
+
+void changeParams(){
+  Serial.print("CD: ");
+  Serial.println(cD);
+  while (!Serial.available()) {
+  }
+  cD = Serial.parseFloat();
+  Serial.print("CI: ");
+  Serial.println(cI);
+  while (!Serial.available()) {
+  }
+  cI = Serial.parseFloat();
+  Serial.print("CP: ");
+  Serial.print(cP);
+  while (!Serial.available()) {
+  }
+  cP = Serial.parseFloat();
+  Serial.print("PID ");
+  Serial.print(PID);
+  while (!Serial.available()) {
+  }
+  PID = Serial.parseFloat();
+  Serial.print("PIDScale ");
+  Serial.print(PIDScale);
+  while (!Serial.available()) {
+  }
+  PIDScale = Serial.parseFloat();
+  Serial.print("PIDShift ");
+  Serial.print(PIDShift);
+  while (!Serial.available()) {
+  }
+  PIDShift = Serial.parseFloat();
 }
 
 
@@ -388,8 +428,9 @@ void initialise_IMU() {
   // LT = Left Thruster - Vertical
   // RT = Right Thruster - Vertical
 void stationKeepRoll() {
-  // use moving average to avoid reacting to transients
-  double roll = txdata.GyroY;
+  Serial.println("Hi");
+  double roll = txdata.AccRoll;
+  
   //  After you've read the angle from 0 (roll)
   angSum += roll;
   PID = cP*roll + cI*angSum + cD*(roll - oldAngle);
@@ -399,12 +440,15 @@ void stationKeepRoll() {
   //  <output> -> PIDScale*PID + PIDShift;
 
   int leftVal = PIDScale*PID + PIDShift;   // TODO: NEED TO COME UP WITH APPROPRIATE TRANSFROMATION HERE
+  Serial.println(leftVal); // 90 is stationary, 180 is pos, 0 is neg
+
+  // transform right thruster value to equivalent opposite value of left thruster
   int diff = 90 - leftVal;
   int rightVal = 90 + diff;
 
   // Send values to thruster
-   ESCVL.write(leftVal);
-   ESCVR.write(rightVal);
+  ESCVL.write(leftVal);
+  ESCVR.write(rightVal);
 }
 
 void read_IMU(){
@@ -424,22 +468,28 @@ void read_IMU(){
   txdata.AccRoll = accRoll;
   txdata.AccPitch = accPitch;
 
-//  Serial.println("");
-//  Serial.print("Accel Pitch: ");
-//  Serial.println(accPitch);
-//  Serial.print("Accel Roll: ");
-//  Serial.println(accRoll);
-//  Serial.print("Acc: ");
-//  Serial.print(acc.x_axis);
-//  Serial.print(", ");
-//  Serial.print(acc.y_axis);
-//  Serial.print(", ");
-//  Serial.println(acc.z_axis);
-//  Serial.print("Gyro: ");
-//  Serial.print(gyr.x_axis);
-//  Serial.print(", ");
-//  Serial.print(gyr.y_axis);
-//  Serial.print(", ");
-//  Serial.println(gyr.z_axis);
-//  Serial.println("");
+  // if the ptich is  negative value, the roll is on the left side
+  if(accPitch < 0){
+    // roll now assigned to any value between -90 to 0 to 90.
+    txdata.AccRoll = -accRoll;
+  }
+
+  Serial.println("");
+  Serial.print("Accel Pitch: ");
+  Serial.println(accPitch);
+  Serial.print("Accel Roll: ");
+  Serial.println(accRoll);
+  Serial.print("Acc: ");
+  Serial.print(acc.x_axis);
+  Serial.print(", ");
+  Serial.print(acc.y_axis);
+  Serial.print(", ");
+  Serial.println(acc.z_axis);
+  Serial.print("Gyro: ");
+  Serial.print(gyr.x_axis);
+  Serial.print(", ");
+  Serial.print(gyr.y_axis);
+  Serial.print(", ");
+  Serial.println(gyr.z_axis);
+  Serial.println("");
 }

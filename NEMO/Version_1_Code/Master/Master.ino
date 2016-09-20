@@ -65,7 +65,6 @@
 #include <LiquidCrystal.h>
 #include <TVout.h>
 #include <video_gen.h>
-#include <TVout.h>
 #include <fontALL.h>
 
 #define W 136          // on screen display width and height
