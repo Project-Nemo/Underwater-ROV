@@ -70,10 +70,10 @@ void setup() {                                        //set up the hardware
 
   /*SD Card Initializing Code*/
   if (!SD.begin(chipSelect)) {
-    Serial.println("SD Card failed, or not present");
+    //Serial.println("SD Card failed, or not present");
     sdCardAvailable = false;
   } else {
-    Serial.println("SD card initialized.");
+    //Serial.println("SD card initialized.");
     sdCardAvailable = true;
     int dataNumber = 0;
     fileName = "data" + String(dataNumber) + ".csv";
@@ -86,16 +86,16 @@ void setup() {                                        //set up the hardware
         break;
       }
     }
-    Serial.print("file name to save data is :");
-    Serial.println(fileName);
+    //Serial.print("file name to save data is :");
+    //Serial.println(fileName);
     File SD_file = SD.open(fileName, FILE_WRITE);
         // if the file is available, write to it:
         if (SD_file) {
           SD_file.println("Time,Temp,Light,Turbidity,UV,EC,TSD,SAL,GRAV");
-          Serial.println("Time,Temp,Light,Turbidity,UV,EC,TSD,SAL,GRAV");
+          //Serial.println("Time,Temp,Light,Turbidity,UV,EC,TSD,SAL,GRAV");
           SD_file.close();;
-        } else
-          Serial.println("Error writing to SD");
+        } //else
+          //Serial.println("Error writing to SD");
   }
   
   /*DS18b20 Dallas one wire*/
@@ -131,8 +131,8 @@ void loop() {
     String command;
     command = Serial.readString();
     ASSerial.print(command); 
-    Serial.println("command:");
-    Serial.print(command);
+    //Serial.println("command:");
+    //Serial.print(command);
   }
 
   if (input_string_complete) {                        //if a string from the PC has been received in its entirety
@@ -153,7 +153,7 @@ void loop() {
 
   if (sensor_string_complete == true) {               //if a string from the Atlas Scientific product has been received in its entirety
     if (isdigit(sensorstring[0]) == false) {          //if the first character in the string is a digit
-      Serial.println(sensorstring);                   //send that string to the PC's serial monitor
+      //Serial.println(sensorstring);                   //send that string to the PC's serial monitor
     }
     else                                              //if the first character in the string is NOT a digit
     {
@@ -168,7 +168,7 @@ void loop() {
       datastring += get_UV();                         //Add UV to string
       datastring += ',';
       datastring += sensorstring;                     //Add AS conductivity to string
-      Serial.println(datastring);
+      //Serial.println(datastring);
       if(sdCardAvailable){
         File SD_file = SD.open(fileName, FILE_WRITE);
         // if the file is available, write to it:
@@ -176,15 +176,10 @@ void loop() {
           podDataOut.SensorData = datastring;
           SD_file.println(datastring);
           SD_file.close();
-          Serial.println("write to SD successful");
-        } else
-          Serial.println("Error writing to SD");
+          //Serial.println("write to SD successful");
+        } //else
+          //Serial.println("Error writing to SD");
       }
-
-
-
-
-      
     }
     sensorstring = "";                                //clear the string
     sensor_string_complete = false;                   //reset the flag used to tell if we have received a completed string from the Atlas Scientific product
@@ -200,9 +195,17 @@ float get_temp(){
 //returns turbidity value
 float get_turbidity(){
   float turbidity;
-  turbidity = averageAnalogRead(TURBIDITY_OUT)-40;
+  float ntu;
+  turbidity = averageAnalogRead(TURBIDITY_OUT)-65;
   turbidity *= 0.00488; // 5/1024 = 0.00488 --> converts to voltage
-  return turbidity;
+  /*Linear Approximation of Turbidity*/
+  if (turbidity > 2.8)
+    ntu = (turbidity-4.3856)/-0.0011;
+  else if(turbidity >1.8)
+    ntu = (turbidity - 3.8183)/-0.0007;
+  else
+    ntu = (turbidity - 3.1929)/-0.0005;
+  return ntu;
 }
 
 //returns UV value
