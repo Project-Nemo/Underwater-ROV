@@ -70,6 +70,7 @@
 #define W 136          // on screen display width and height
 #define H 96
 
+TVout tv;
 PS2X ps2x;  //The PS2 Controller Class
 EasyTransfer ETin, ETout;  //Create the two Easy transfer Objects for
 // Two way communication
@@ -82,6 +83,7 @@ const int yelLEDpin = 2;  //yellow LED is on Digital pin 2
 const int VwarnLEDpin = 5;  //Voltage warning LED is on Pin D5
 const int TwarnLEDpin = 6;  //ROV temp warning LED is on Pin D6
 const int LowBatVolts10 = 96;  //This is for holding the value of the
+const int LowPodVolts10 = 96; 
 //Low Battery Voltage warning Voltage threshold x10.
 
 int ForwardVal = 0;  //Value read off the PS2 Right Stick up/down.
@@ -117,6 +119,17 @@ struct RECEIVE_DATA_STRUCTURE {
   int AccPitch;
   int PodPower;
   int PodState;
+
+  // for tuning PID
+  int cP;
+  int cD;
+  int cI;
+  int pidScale;
+  int pidShift;
+  int low_bound;
+  int high_bound;
+
+  String sensorData;
 };
 
 struct SEND_DATA_STRUCTURE {
@@ -128,6 +141,16 @@ struct SEND_DATA_STRUCTURE {
   volatile boolean CamPhotoShot; // Camera photo trigger signal
   volatile boolean CamRec;  //Camera record function toggle
   volatile boolean LEDHdlts; //LED headlights on/off toggle
+
+  // for tuning PID
+  int cP;
+  int cD;
+  int cI;
+  int pidScale;
+  int pidShift;
+  int low_bound;
+  int high_bound;
+  volatile boolean changed;
 };
 
 //give a name to the group of data
@@ -169,6 +192,7 @@ void setup() {
 }
 
 void loop() {
+  txdata.changed = false; // TODO: PID TUNING HELPER
   ps2x.read_gamepad(); //This needs to be called at least once a second
   // to get data from the controller.
   if (ps2x.Button(PSB_PAD_UP)) { //Pressed and held
@@ -229,7 +253,7 @@ void loop() {
   txdata.HRraw = map(txdata.HRraw, -256, 256, 0, 179);
 
 
-
+  
   // Send the message to the serial port for the ROV Arduino
   ETout.sendData();
 
@@ -305,6 +329,55 @@ void loop() {
   // onscreen display
   updateOnScreenDisplay();
   delay(18);
+
+  Serial.println(rxdata.sensorData);
+
+  // adjust PID values
+  if (Serial.available()) {
+    char ch = Serial.read();
+    if (ch == 'x') {
+      changeParams();
+    }
+  }
+}
+
+void changeParams(){
+  txdata.changed = true;
+  Serial.print("CD: ");
+  Serial.println(rxdata.cD);
+  while (!Serial.available()) {
+  }
+  txdata.cD = Serial.parseFloat();
+  Serial.print("CI: ");
+  Serial.println(rxdata.cI);
+  while (!Serial.available()) {
+  }
+  txdata.cI = Serial.parseFloat();
+  Serial.print("CP: ");
+  Serial.print(rxdata.cP);
+  while (!Serial.available()) {
+  }
+  txdata.cP = Serial.parseFloat();
+  Serial.print("PIDScale ");
+  Serial.print(rxdata.pidScale);
+  while (!Serial.available()) {
+  }
+  txdata.pidScale = Serial.parseFloat();
+  Serial.print("PIDShift ");
+  Serial.print(rxdata.pidShift);
+  while (!Serial.available()) {
+  }
+  txdata.pidShift = Serial.parseFloat();
+  Serial.print("Low Bound ");
+  Serial.print(rxdata.low_bound);
+  while (!Serial.available()) {
+  }
+  txdata.low_bound = Serial.parseFloat();
+  Serial.print("High Bound ");
+  Serial.print(rxdata.high_bound);
+  while (!Serial.available()) {
+  }
+  txdata.high_bound = Serial.parseFloat();
 }
 
 // Initialize ATMega registers for video overlay capability.
@@ -328,49 +401,49 @@ ISR(INT0_vect) {
 void updateOnScreenDisplay(){
   // write all display code in here
   tv.fill(0);
-  drawAngle(int rxdata.AccRoll);
-  drawROVBattery(int rxdata.BattVolt);
-  drawPodBattery(int rxdata.PodPower);
-  ROVBattLow(int rxdata.PodPower);
-  PodBattLow(int rxdata.PodPower);
-  ROVTempHigh(int rxdata.RovTemp);
+  drawAngle(rxdata.AccRoll);
+  drawROVBattery(rxdata.BattVolt);
+  drawPodBattery(rxdata.PodPower);
+  ROVBattLow(rxdata.BattVolt);
+  PodBattLow(rxdata.PodPower);
+  ROVTempHigh(rxdata.ROVTemp);
 }
   //--Artificial Horizon--//
- void drawAngle(int angledata){
+void drawAngle(int angledata){
    //USE GYRO OR ROVHDG VARIABLE Need to see what unit is output to format for Angle assignment
   angledeg = angledata; //may need to modify this equation
-  angle = angledeg * PI / 180.0;
+  float angle = angledeg * PI / 180.0;
   tv.fill(0);
   drawGraph();
   if (angle == 0.0){
-    tv.draw_line(centrex- linelen, originy, centrex+linelen, originy);
+    tv.draw_line(centrex- linelen, originy, centrex+linelen, originy, 1);
   }else if (angle > 0.0){
-    x = sin(angle) * (double)linelen;
-    y = cos(angle) * (double)linelen;
-    tv.draw_line(centrex + (int)x , originy + (int)y, centrex - (int)x, originy - (int)y);
+    float x = sin(angle) * (double)linelen;
+    float y = cos(angle) * (double)linelen;
+    tv.draw_line(centrex + (int)x , originy + (int)y, centrex - (int)x, originy - (int)y, 1);
   }else if (angle < 0.0){
-    x = sin(abs(angle)) * (double)linelen;
-    y = cos(abs(angle)) * (double)linelen;
-    tv.draw_line(centrex - (int)x, originy + (int)y, centrex + (int)x, originy - (int)y);
+    float x = sin(abs(angle)) * (double)linelen;
+    float y = cos(abs(angle)) * (double)linelen;
+    tv.draw_line(centrex - (int)x, originy + (int)y, centrex + (int)x, originy - (int)y, 1);
   }
   angledeg =angledeg +1.0;
   if (angledeg > 90.0){
     angledeg = -90.0;
   }
 }
-  //--Pod Battery Update--//
-void drawPodBattery(int BattVolt){
+  //--ROV Battery Update--//
+void drawROVBattery(int BattVolt){
   tv.draw_rect(originx,15,10,5,1, -1);
   tv.draw_rect(originx,15,(int)BattVolt,5,1,1); // Will need to rescale BattVolt
-   }
-  // --ROV Battery Update--//
-  drawPodBattery(int PodPower){
+}
+  // --Pod Battery Update--//
+void drawPodBattery(int PodPower){
   tv.draw_rect(originx,8,10,5,1, -1);
   tv.draw_rect(originx,8,(int)PodPower,5,1,1); // Will need to rescale PodPower
-  }
-  // if rov battery low, print message//
-  
-void rovBattLow(int BattVolt){
+}
+
+// if rov battery low, print message// 
+void ROVBattLow(int BattVolt){
   
   if (BattVolt < LowBatVolts10) {
       tv.print(20,20, "ROV BATTERY LOW");
@@ -381,7 +454,7 @@ void rovBattLow(int BattVolt){
   // if pod battery low, print message//
   
 void PodBattLow(int PodPower){
-  if (PodPower < LowBatVolts10) { //Change LowBatVolts10
+  if (PodPower < LowPodVolts10) { //Change LowBatVolts10
       tv.print(20,30, "POD BATTERY LOW");
     } else {
       tv.print(20,30, "");
@@ -402,8 +475,3 @@ void drawGraph() {
   tv.draw_line(originx, originy, 120, originy, 1);
   tv.draw_circle(60, originy, 15, WHITE, -1);
 }
-
-
-  
-
-
