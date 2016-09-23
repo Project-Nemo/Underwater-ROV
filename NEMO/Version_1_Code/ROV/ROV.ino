@@ -401,6 +401,8 @@ void initialise_IMU() {
   while(!accelerometer.begin()){
     delay(500);
   }
+  
+  Serial.println("Hi there");
   // Initialize L3G4200D
   while(!gyroscope.begin(SCALE_250DPS, DATARATE_400HZ_50)){
     delay(500);
