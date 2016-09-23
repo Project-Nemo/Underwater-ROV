@@ -114,7 +114,7 @@ int angle; //calculated horizontal heading angle.
 // station keeping variables for PID
 double oldAngle = 0, angSum = 0, PID = 0;      // PID variables
 double cP = 1, cI = 1, cD = 1;                 // PID constants
-double PIDScale = 0, PIDShift = 0;             // output scaling
+double PIDScale = 1, PIDShift = 0;             // output scaling
 
 float MS5803Press;  //Pressure from the MS5803 Sensor.
 float MS5803Temp;  //Temperature from the MS5803 Sensor.
@@ -209,7 +209,7 @@ void setup()
   // Initialize the MS5803 sensor.
   sensor.initializeMS_5803();
 
-  delay(10000);   //Ten second delay
+  //delay(10000);   //Ten second delay
   //The ESC should now be initialised and ready to run.
 
   Serial.begin(9600); //Begin Serial to talk to the Master Arduino
@@ -231,7 +231,6 @@ void setup()
   digitalWrite(CamRecTrig, LOW); //Trip the photo trigger.
   delay(100);
   digitalWrite(CamRecTrig, HIGH);
-  Serial.println("Hello");
 }
 
 void loop() {
@@ -442,15 +441,14 @@ void stationKeepRoll() {
   //  <output> -> PIDScale*PID + PIDShift;
 
   int leftVal = PIDScale*PID + PIDShift;   // TODO: NEED TO COME UP WITH APPROPRIATE TRANSFROMATION HERE
-  Serial.println(leftVal); // 90 is stationary, 180 is pos, 0 is neg
 
   // transform right thruster value to equivalent opposite value of left thruster
   int diff = 90 - leftVal;
   int rightVal = 90 + diff;
 
   // Send values to thruster
-  ESCVL.write(leftVal);
-  ESCVR.write(rightVal);
+   ESCVL.write(leftVal);
+   ESCVR.write(rightVal);
 }
 
 void read_IMU(){
