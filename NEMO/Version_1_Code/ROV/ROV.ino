@@ -138,6 +138,16 @@ struct RECEIVE_DATA_STRUCTURE {
   volatile boolean CamPhotoShot; // Camera photo trigger signal
   volatile boolean CamRec;  //Camera record function toggle
   volatile boolean LEDHdlts; //LED headlights on/off toggle
+
+  // for tuning PID
+  int cP;
+  int cD;
+  int cI;
+  int pidScale;
+  int pidShift;
+  int low_bound;
+  int high_bound;
+  volatile boolean changed;
 };
 
 struct SEND_DATA_STRUCTURE {
@@ -155,6 +165,18 @@ struct SEND_DATA_STRUCTURE {
   int AccPitch;
   int PodPower;
   int PodState;
+
+  // for tuning PID
+  int cP;
+  int cD;
+  int cI;
+  int pidScale;
+  int pidShift;
+  int low_bound;
+  int high_bound;
+
+  // testing
+  String sensorData;
 };
 
 struct RESEARCH_POD_RECEIVE_DATA {
@@ -213,7 +235,7 @@ void setup()
   // Initialize the MS5803 sensor.
   sensor.initializeMS_5803();
 
-  //delay(10000);   //Ten second delay
+  delay(10000);   //Ten second delay
   //The ESC should now be initialised and ready to run.
 
   Serial.begin(9600); //Begin Serial to talk to the Master Arduino
@@ -332,24 +354,38 @@ void loop() {
 
   if(SETin.receiveData()){
     Serial.println(podDataIn.SensorData);  // FOR TESTING
+    txdata.sensorData = podDataIn.SensorData;
+  }
+
+  if(rxdata.changed){
+    cD = rxdata.cD;
+    cP = rxdata.cP;
+    cI = rxdata.cI;
+    PIDShift = rxdata.pidShift;
+    PIDScale = rxdata.pidScale;
+    low_bound = rxdata.low_bound;
+    high_bound = rxdata.high_bound;
+    // reset PID
+    oldAngle = 0;
+    angSum = 0;
+    PID = 0; 
   }
 
   // read acceleration and gyroscope values
   read_IMU();
   pid();
+  txdata.cD = cD;
+  txdata.cP = cP;
+  txdata.cI = cI;
+  txdata.pidShift = PIDShift;
+  txdata.pidScale = PIDScale;
+  txdata.low_bound = low_bound;
+  txdata.high_bound = high_bound;
 
   // trigger station keeping code if throttles on PS2 controller are not being moved
   // assumes 0 is not moving value.
   if(isNotControllingROV(rxdata.upLraw, rxdata.upRraw, rxdata.HLraw, rxdata.HRraw, 0)){
      stationKeepRoll();
-  }
-
-  // adjust PID values
-  if (Serial.available()) {
-    char ch = Serial.read();
-    if (ch == 'x') {
-      changeParams();
-    }
   }
 }
 
