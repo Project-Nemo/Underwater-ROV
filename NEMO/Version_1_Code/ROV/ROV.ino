@@ -516,7 +516,7 @@ void read_IMU(){
   // negative rolling to the left, positive to the right
   if(accPitch < 0){
     // will give a value between -90 and 0, -90 being the horizontal on the left and 0 being the neutral
-    txdata.AccRoll = -accRoll - 90; 
+    txdata.AccRoll = accRoll - 90; 
   } else {
     // will give a value between 0 and 90, 0 being the neutral and 90 being the horizontal on the right
     txdata.AccRoll = -accRoll + 90; 
@@ -526,7 +526,7 @@ void read_IMU(){
   Serial.print("Accel Pitch: ");
   Serial.println(accPitch);
   Serial.print("Accel Roll: ");
-  Serial.println(accRoll);
+  Serial.println(txdata.AccRoll);
   Serial.print("Acc: ");
   Serial.print(acc.x_axis);
   Serial.print(", ");
