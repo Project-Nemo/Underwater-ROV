@@ -113,8 +113,12 @@ int angle; //calculated horizontal heading angle.
 
 // station keeping variables for PID
 double oldAngle = 0, angSum = 0, PID = 0;      // PID variables
-double cP = 1, cI = 1, cD = 1;                 // PID constants
-double PIDScale = 1, PIDShift = 0;             // output scaling
+double cP = 0.9, cI = 0, cD = 0.1;                 // PID constants
+double PIDScale = 1, PIDShift = 90;             // output scaling
+int leftVal;
+int rightVal;
+int low_bound = -10;
+int high_bound = 10;
 
 float MS5803Press;  //Pressure from the MS5803 Sensor.
 float MS5803Temp;  //Temperature from the MS5803 Sensor.
@@ -332,6 +336,7 @@ void loop() {
 
   // read acceleration and gyroscope values
   read_IMU();
+  pid();
 
   // trigger station keeping code if throttles on PS2 controller are not being moved
   // assumes 0 is not moving value.
@@ -414,6 +419,22 @@ void initialise_IMU() {
   Serial.println("Finish Calibration");
 }
 
+void pid(){
+  Serial.println("Calculating PID");
+  double roll = txdata.AccRoll;
+  
+  //  After you've read the angle from 0 (roll)
+  angSum += roll;
+  PID = cP*roll + cI*angSum + cD*(roll - oldAngle);
+  oldAngle = roll;
+
+  leftVal = PIDScale*PID + PIDShift;  
+
+  // transform right thruster value to equivalent opposite value of left thruster
+  int diff = 90 - leftVal;
+  rightVal = 90 + diff;
+}
+
   //    - <- -> +
   //      Z Axis
   //        |
@@ -429,26 +450,12 @@ void initialise_IMU() {
   // LT = Left Thruster - Vertical
   // RT = Right Thruster - Vertical
 void stationKeepRoll() {
-  Serial.println("Hi");
-  double roll = txdata.AccRoll;
-  
-  //  After you've read the angle from 0 (roll)
-  angSum += roll;
-  PID = cP*roll + cI*angSum + cD*(roll - oldAngle);
-  oldAngle = roll;
-
-  //  Output adjustment
-  //  <output> -> PIDScale*PID + PIDShift;
-
-  int leftVal = PIDScale*PID + PIDShift;   // TODO: NEED TO COME UP WITH APPROPRIATE TRANSFROMATION HERE
-
-  // transform right thruster value to equivalent opposite value of left thruster
-  int diff = 90 - leftVal;
-  int rightVal = 90 + diff;
-
+  // if the angle is between -10 and 10
   // Send values to thruster
+  if(txdata.AccRoll < low_bound || txdata.AccRoll > high_bound){
    ESCVL.write(leftVal);
    ESCVR.write(rightVal);
+  }
 }
 
 void read_IMU(){
@@ -469,9 +476,14 @@ void read_IMU(){
   txdata.AccPitch = accPitch;
 
   // if the ptich is  negative value, the roll is on the left side
+  // roll is now any value between 0 to 90 to 0.
+  // negative rolling to the left, positive to the right
   if(accPitch < 0){
-    // roll now assigned to any value between -90 to 0 to 90.
-    txdata.AccRoll = -accRoll;
+    // will give a value between -90 and 0, -90 being the horizontal on the left and 0 being the neutral
+    txdata.AccRoll = -accRoll - 90; 
+  } else {
+    // will give a value between 0 and 90, 0 being the neutral and 90 being the horizontal on the right
+    txdata.AccRoll = -accRoll + 90; 
   }
 
   Serial.println("");
