@@ -97,7 +97,7 @@ volatile boolean PhotoActive = false;  // A flag to show that the camera signal 
 unsigned char originx = 5;     // start x position for on screen display
 unsigned char originy = 80;    // start y position for on screen display
 unsigned char centrex = 60;
-int linelen = 25;
+int linelen = 16;
 float angledeg = -90.0 ;
 
 struct RECEIVE_DATA_STRUCTURE {
@@ -165,9 +165,7 @@ void setup() {
   tv.delay(500);
   initOverlay();
   tv.select_font(font6x8);
-  tv.fill(0);
-  drawGraph();      // TODO ???
-  randomSeed(analogRead(0));  // TODO ???
+  
 }
 
 void loop() {
@@ -329,40 +327,83 @@ ISR(INT0_vect) {
 
 void updateOnScreenDisplay(){
   // write all display code in here
-  // pod battery
-  // rov battery
-  // artifical horizon
-  // if rov battery low, print message
-  // if pod battery low, print message
-  // if temp to high, print message
+  tv.fill(0);
+  drawAngle(int rxdata.AccRoll);
+  drawROVBattery(int rxdata.BattVolt);
+  drawPodBattery(int rxdata.PodPower);
+  ROVBattLow(int rxdata.PodPower);
+  PodBattLow(int rxdata.PodPower);
+  ROVTempHigh(int rxdata.RovTemp);
 }
-
+  //--Artificial Horizon--//
+ void drawAngle(int angledata){
+   //USE GYRO OR ROVHDG VARIABLE Need to see what unit is output to format for Angle assignment
+  angledeg = angledata; //may need to modify this equation
+  angle = angledeg * PI / 180.0;
+  tv.fill(0);
+  drawGraph();
+  if (angle == 0.0){
+    tv.draw_line(centrex- linelen, originy, centrex+linelen, originy);
+  }else if (angle > 0.0){
+    x = sin(angle) * (double)linelen;
+    y = cos(angle) * (double)linelen;
+    tv.draw_line(centrex + (int)x , originy + (int)y, centrex - (int)x, originy - (int)y);
+  }else if (angle < 0.0){
+    x = sin(abs(angle)) * (double)linelen;
+    y = cos(abs(angle)) * (double)linelen;
+    tv.draw_line(centrex - (int)x, originy + (int)y, centrex + (int)x, originy - (int)y);
+  }
+  angledeg =angledeg +1.0;
+  if (angledeg > 90.0){
+    angledeg = -90.0;
+  }
+}
+  //--Pod Battery Update--//
+void drawPodBattery(int BattVolt){
+  tv.draw_rect(originx,15,10,5,1, -1);
+  tv.draw_rect(originx,15,(int)BattVolt,5,1,1); // Will need to rescale BattVolt
+   }
+  // --ROV Battery Update--//
+  drawPodBattery(int PodPower){
+  tv.draw_rect(originx,8,10,5,1, -1);
+  tv.draw_rect(originx,8,(int)PodPower,5,1,1); // Will need to rescale PodPower
+  }
+  // if rov battery low, print message//
+  
+void rovBattLow(int BattVolt){
+  
+  if (BattVolt < LowBatVolts10) {
+      tv.print(20,20, "ROV BATTERY LOW");
+    } else {
+      tv.print(20,20, "");
+  }
+}
+  // if pod battery low, print message//
+  
+void PodBattLow(int PodPower){
+  if (PodPower < LowBatVolts10) { //Change LowBatVolts10
+      tv.print(20,30, "POD BATTERY LOW");
+    } else {
+      tv.print(20,30, "");
+  }
+}
+  // if temp to high, print message//
+void ROVTempHigh(int Temp){
+  ROVTMP = (Temp * 0.004882814 - 0.5) * 100; //converts the 0-1024
+    //data value into temperature.
+    if (ROVTMP > 50) {
+      tv.print(20,40, "ROV TEMP HIGH");
+    } else {
+      tv.print(20,40, "");
+    }
+  }
+    
 void drawGraph() {
   tv.draw_line(originx, originy, 120, originy, 1);
   tv.draw_circle(60, originy, 15, WHITE, -1);
 }
 
-void drawBattery(){
-  tv.draw_rect(originx,15,10,5,1, -1);
-}
 
-void drawAngle(){
-  double angle = angledeg * 180.0 / PI;
-  tv.fill(0);
-  drawGraph();
-  if (angle == 0.0) {
-    drawLine(centrex, originy, centrex, originy - linelen);
-  } else if (angle > 0.0) {
-    double x = cos(angle) * (double)linelen;
-    double y = sin(angle) * (double)linelen;
-    drawLine(centrex, originy, centrex - (int)x, originy - (int)y);
-  }  else if (angle < 0.0) {
-    double x = cos(abs(angle)) * (double)linelen;
-    double y = sin(abs(angle)) * (double)linelen;
-    drawLine(centrex, originy, centrex + (int)x, originy - (int)y);
-  }
-  angledeg =angledeg +1.0;
-  if (angledeg > 90.0) {
-    angledeg = -90.0;
-  }
-}
+  
+
+
