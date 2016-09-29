@@ -86,8 +86,8 @@ void setup() {
         break;
       }
     }
-    //Serial.print("file name to save data is :");
-    //Serial.println(fileName);
+    Serial.print("file name to save data is :");
+    Serial.println(fileName);
     File SD_file = SD.open(fileName, FILE_WRITE);
         // if the file is available, write to it:
         if (SD_file) {
@@ -121,7 +121,6 @@ void setup() {
 void loop() {
   ETout.sendData();
   String dataString = "";
-  
   // Communicate power and status code
   float limit = float(1023); //Take from reference pin?
   float currentRead = float(analogRead(A6));
@@ -155,7 +154,7 @@ void loop() {
 
   if (sensor_string_complete == true) {               //if a string from the Atlas Scientific product has been received in its entirety
     if (isdigit(sensorstring[0]) == false) {          //if the first character in the string is a digit
-      //Serial.println(sensorstring);                   //send that string to the PC's serial monitor
+      Serial.println(sensorstring);                   //send that string to the PC's serial monitor
     }
     else                                              //if the first character in the string is NOT a digit
     {
@@ -178,7 +177,7 @@ void loop() {
       //dataString += String(", Conductivity_TDS_Salinity_GRAV:,");
       dataString += sensorstring;
      // Serial.print(sensorstring);
-     // Serial.print(dataString);
+      Serial.println(dataString);
       if(sdCardAvailable){
         File SD_file = SD.open(fileName, FILE_WRITE);
         // if the file is available, write to it:
@@ -186,7 +185,7 @@ void loop() {
           podDataOut.SensorData = dataString;
           SD_file.println(dataString);
           SD_file.close();
-          //Serial.println("write to SD successful");
+          Serial.println("write to SD successful");
         } //else
           //Serial.println("Error writing to SD");
       } //else

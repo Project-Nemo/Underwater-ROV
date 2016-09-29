@@ -506,13 +506,12 @@ void read_IMU(){
   txdata.GyroX = gyr.x_axis;
   txdata.GyroY = gyr.y_axis;
   txdata.GyroZ = gyr.z_axis;
-  txdata.AccRoll = accRoll;
   txdata.AccPitch = accPitch;
 
   // if the ptich is  negative value, the roll is on the left side
   // roll is now any value between 0 to 90 to 0.
   // negative rolling to the left, positive to the right
-  if(accPitch < 0){
+  if(accPitch > 0){
     // will give a value between -90 and 0, -90 being the horizontal on the left and 0 being the neutral
     txdata.AccRoll = accRoll - 90; 
   } else {
