@@ -57,17 +57,17 @@ Direction button pad down = turn camera downwards
 Direction button pad right = Change reading on display
 Triangle = Start/Stop video recording
 Circle = Take photo
-
-
-
-
 */
 
 
 #include <PS2X_lib.h> // Bill Porter's PS2 Library
 #include <EasyTransfer.h> // Bill Porter's Easy Transfer Library
 #include <LiquidCrystal.h>
+#include <TVout.h>
+#include <fontALL.h>
+#include <video_gen.h>
 
+TVout tv;   // On Screen Display screen variable
 PS2X ps2x;  //The PS2 Controller Class
 EasyTransfer ETin, ETout;  //Create the two Easy transfer Objects for
                             // Two way communication
@@ -91,6 +91,15 @@ int DispOpt = 0; //Variable to signal which value to show on the display
 
 long PhotoSignalRunTime = 0; //A variable to carry the time since photo triggered.
 volatile boolean PhotoActive = false;  // A flag to show that the camera signal has been sent.
+
+// On scren display params for displaying values
+unsigned char originx = 5;     // start x position for on screen display
+unsigned char originy = 80;    // start y position for on screen display
+unsigned char centrex = 60;
+int width = 136;              // on screen display width and height
+int height = 96;
+int linelen = 16;
+float angledeg = -90.0 ;
 
 struct RECEIVE_DATA_STRUCTURE{
   int BattVolt;  //Battery Voltage message from the ROV.
@@ -174,6 +183,12 @@ void setup()
   lcd.setCursor(0,0);  //Move cursor to top left corner
   lcd.print("Ready");  
 
+  // on screen display setup
+  tv.begin(PAL, width, height);
+  tv.delay(500);
+  initOverlay();
+  tv.select_font(font6x8);
+  tv.fill(0);
 }
 
 void loop()
@@ -340,6 +355,14 @@ void loop()
       changeParams();
     }
   }
+}
+
+// ON SCREEN DISPLAY CODE
+
+// Initialize ATMega registers for video overlay capability.
+// Must be called after tv.begin().
+void initOverlay() {
+  
 }
 
 void changeParams(){

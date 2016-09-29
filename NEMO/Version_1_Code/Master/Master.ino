@@ -192,6 +192,7 @@ void setup() {
 
 void loop() {
   txdata.changed = false; // TODO: PID TUNING HELPER
+  
   ps2x.read_gamepad(); //This needs to be called at least once a second
   // to get data from the controller.
   if (ps2x.Button(PSB_PAD_UP)) { //Pressed and held
@@ -328,8 +329,6 @@ void loop() {
   // onscreen display
   updateOnScreenDisplay();
   delay(18);
-
-  Serial.println(rxdata.sensorData);
 
   // adjust PID values
   if (Serial.available()) {
