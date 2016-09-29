@@ -180,7 +180,7 @@ void TVout::delay(unsigned int x) {
  *		The number of frames to delay for.
  */
 void TVout::delay_frame(unsigned int x) {
-	int stop_line = (int)(display.start_render + (display.vres*(display.vscale_const+1)))+1;
+	int stop_line = (int)(display.first_frame_start_render_line + (display.vres * (display.vscale_const + 1))) + 1;
 	while (x) {
 		while (display.scanLine != stop_line);
 		while (display.scanLine == stop_line);
@@ -238,7 +238,10 @@ void TVout::force_outstart(uint8_t time) {
  */
 void TVout::force_linestart(uint8_t line) {
 	delay_frame(1);
-	display.start_render = line;
+	display.first_frame_start_render_line = line;
+	display.first_frame_end_render_line = display.first_frame_start_render_line + (display.vres * (display.vscale_const + 1));
+	display.second_frame_start_render_line = display.lines_frame + display.first_frame_start_render_line;
+	display.second_frame_end_render_line = display.lines_frame + display.first_frame_end_render_line;
 }
 
 
@@ -298,6 +301,7 @@ unsigned char TVout::get_pixel(uint8_t x, uint8_t y) {
  *		The color of the line.
  *		(see color note at the top of this file)
  */
+/* Patched to allow support for the Arduino Leonardo */
 void TVout::draw_line(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, char c) {
 
 	if (x0 > display.hres*8 || y0 > display.vres || x1 > display.hres*8 || y1 > display.vres)
@@ -809,7 +813,11 @@ void TVout::tone(unsigned int frequency, unsigned long duration_ms) {
 	if (frequency == 0)
 		return;
 
+#if defined(__AVR_ATmega32U4__)
+#define TIMER 0
+#else
 #define TIMER 2
+#endif
 	//this is init code
 	TCCR2A = 0;
 	TCCR2B = 0;
@@ -875,20 +883,3 @@ void TVout::noTone() {
 	TCCR2B = 0;
 	PORT_SND &= ~(_BV(SND_PIN)); //set pin 11 to 0
 } // end of noTone
-
-// BEGIN Video Experimenter
-void TVout::capture() {
-  captureFlag = 1;
-  while (captureFlag > 0);
-}
-
-void TVout::resume() {
-  resume_render();
-}
-
-void TVout::setDataCapture(int line, int wait, uint8_t *buf) {
-  dataCaptureLine = line;
-  dataCaptureWait = wait;
-  dataCaptureBuf = buf;
-}
-// END Video Experimenter
