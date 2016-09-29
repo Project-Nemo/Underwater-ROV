@@ -1,33 +1,33 @@
 /*
-ROVPS2Control_Masterv8.ino
-Hamish Trolove – 30 March 2016
-www.techmonkeybusiness.com
-This sketch takes control commands from a PS2 handset and transmits the
-commands using Bill Porter's EasyTransfer Library over a 9600 baud serial
-link (100m tether).
+  ROVPS2Control_Masterv8.ino
+  Hamish Trolove – 30 March 2016
+  www.techmonkeybusiness.com
+  This sketch takes control commands from a PS2 handset and transmits the
+  commands using Bill Porter's EasyTransfer Library over a 9600 baud serial
+  link (100m tether).
 
-This sketch is designed for an Arduino Nano with only one Serial Port.
+  This sketch is designed for an Arduino Nano with only one Serial Port.
 
-Pin assignments are:
+  Pin assignments are:
 
-3.3V output to PS2 red Pin
-Pin D10 to PS2 yellow pin
-Pin D11 to PS2 orange pin
-Pin D12 to PS2 brown pin
-Pin D13 to PS2 blue pin
+  3.3V output to PS2 red Pin
+  Pin D10 to PS2 yellow pin
+  Pin D11 to PS2 orange pin
+  Pin D12 to PS2 brown pin
+  Pin D13 to PS2 blue pin
 
-Pin D2 to LED Camera Photo Trigger Indicator
-Pin D3 to LED Camera Record Indicator
-Pin D4 to LED Main Lights Indicator
-Pin D5 to LED ROV Battery Low Voltage Warning
-Pin D6 to LED ROV Interior high temperature warning
+  Pin D2 to LED Camera Photo Trigger Indicator
+  Pin D3 to LED Camera Record Indicator
+  Pin D4 to LED Main Lights Indicator
+  Pin D5 to LED ROV Battery Low Voltage Warning
+  Pin D6 to LED ROV Interior high temperature warning
 
-Communications
-Serial Connection: Topside D1 (TX) to ROV D0 (RX)
-Serial Connection: Topside D0 (RX) to ROV D1 (TX)
-Connect the GND on both
+  Communications
+  Serial Connection: Topside D1 (TX) to ROV D0 (RX)
+  Serial Connection: Topside D0 (RX) to ROV D1 (TX)
+  Connect the GND on both
 
-A 16x2 LCD screen is connected as follows
+  A 16x2 LCD screen is connected as follows
   VSS to GND
   VDD to 5V output of MC78T05CT regulator
   VO to sweep arm of 10kohm variable resistor
@@ -41,22 +41,22 @@ A 16x2 LCD screen is connected as follows
   A to 5V output of MC78T05CT regulator
   K to GND via a 330ohm resistor
 
-5V is supplied from a regulator to the 1Kohm pull up resistors
-for PS2 as well as the LCD screen and it's backlight 
+  5V is supplied from a regulator to the 1Kohm pull up resistors
+  for PS2 as well as the LCD screen and it's backlight
 
-The coding pulls on the PSX library developed by Bill Porter.
-See www.billporter.info for the latest from Bill Porter and to
-download the library.
+  The coding pulls on the PSX library developed by Bill Porter.
+  See www.billporter.info for the latest from Bill Porter and to
+  download the library.
 
-The controls for the ROV are;
-Left Stick - X-axis = Roll, Y-axis = Up/down
-Right Stick - X-axis = Yaw, Y-axis = forward/back
-Direction button pad left = LED Main lights On/Off toggle
-Direction button pad up = turn camera upwards
-Direction button pad down = turn camera downwards
-Direction button pad right = Change reading on display
-Triangle = Start/Stop video recording
-Circle = Take photo
+  The controls for the ROV are;
+  Left Stick - X-axis = Roll, Y-axis = Up/down
+  Right Stick - X-axis = Yaw, Y-axis = forward/back
+  Direction button pad left = LED Main lights On/Off toggle
+  Direction button pad up = turn camera upwards
+  Direction button pad down = turn camera downwards
+  Direction button pad right = Change reading on display
+  Triangle = Start/Stop video recording
+  Circle = Take photo
 */
 
 
@@ -73,24 +73,25 @@ Circle = Take photo
 TVout tv;   // On Screen Display screen variable
 PS2X ps2x;  //The PS2 Controller Class
 EasyTransfer ETin, ETout;  //Create the two Easy transfer Objects for
-                            // Two way communication
+// Two way communication
 
-LiquidCrystal lcd(A0,A1,A2,A3,A4,A5);   //Pins for the LCD display
+LiquidCrystal lcd(A0, A1, A2, A3, A4, A5); //Pins for the LCD display
 
 const int grnLEDpin = 4;  //green LED is on Digital pin 4
 const int redLEDpin = 3;  //red LED is on Digital pin 3.
 const int yelLEDpin = 2;  //yellow LED is on Digital pin 2
 const int VwarnLEDpin = 5;  //Voltage warning LED is on Pin D5
 const int TwarnLEDpin = 6;  //ROV temp warning LED is on Pin D6
-const int LowBatVolts10 = 96;  //This is for holding the value of the 
-                            //Low Battery Voltage warning Voltage threshold x10.
+const int LowBatVolts10 = 96;  //This is for holding the value of the
+const int LowPodVolts10 = 96;  
+//Low Battery Voltage warning Voltage threshold x10.
 
 int ForwardVal = 0;  //Value read off the PS2 Right Stick up/down.
 int YawLeftVal = 0;  //Value read off the PS2 Right Stick left/right
 int UpVal = 0; //Value read off the PS2 Left Stick up/down
 int RollLeftVal = 0; // Value read off the PS2 Left Stick left/right
 float ROVTMP = 0;  //Variable to hold the converted ROV interior temperature.
-int DispOpt = 0; //Variable to signal which value to show on the display 
+int DispOpt = 0; //Variable to signal which value to show on the display
 
 long PhotoSignalRunTime = 0; //A variable to carry the time since photo triggered.
 volatile boolean PhotoActive = false;  // A flag to show that the camera signal has been sent.
@@ -100,20 +101,8 @@ unsigned char originx = 5;     // start x position for on screen display
 unsigned char originy = 80;    // start y position for on screen display
 unsigned char centrex = 60;
 int linelen = 16;
-float angledeg = -90.0 ;
 
-char s[32];
-unsigned int n = 0;
-int index = 0;
-double x;
-double y;
-int messageLen = 32;
-char message[] = "";
-char saveChar;
-float angle ;
-int battery = 100;
-
-struct RECEIVE_DATA_STRUCTURE{
+struct RECEIVE_DATA_STRUCTURE {
   int BattVolt;  //Battery Voltage message from the ROV.
   int ROVTemp; //ROV interior temperature back from the ROV
   int ROVDepth; //ROV depth reading (m)
@@ -143,7 +132,7 @@ struct RECEIVE_DATA_STRUCTURE{
   String sensorData;
 };
 
-struct SEND_DATA_STRUCTURE{
+struct SEND_DATA_STRUCTURE {
   int upLraw;  //Variables to carry the actual raw data for the ESCs
   int upRraw;
   int HLraw;
@@ -170,7 +159,7 @@ SEND_DATA_STRUCTURE txdata;
 
 void setup()
 {
-  ps2x.config_gamepad(13,11,10,12, false, false);
+  ps2x.config_gamepad(13, 11, 10, 12, false, false);
   //setup pins and settings: GamePad(clock, command, attention, data, Pressures?, Rumble?)
   //We have disabled the pressure sensitivity and rumble in this instance and
   //we know the controller type so we have not bothered with the error checks
@@ -181,10 +170,10 @@ void setup()
   pinMode(TwarnLEDpin, OUTPUT);  //Sets the overtemperature warning pin to output.
   txdata.CamRec = false;  //Sets the Camera default to not recording
   txdata.CamPhotoShot = false; //Sets the Camera default to no phototaken
-  txdata.CamPitch =90;  //Sets the Camera Pitch to be level
+  txdata.CamPitch = 90; //Sets the Camera Pitch to be level
   lcd.begin(16, 2);
   lcd.clear();  //make sure screen is clear.
-  lcd.setCursor(0,0);  //Move cursor to top left corner
+  lcd.setCursor(0, 0); //Move cursor to top left corner
   lcd.print("Initialising");
 
   delay(10000);    //The 10 second delay to allow opportunity to upload new programs.
@@ -192,8 +181,8 @@ void setup()
   ETin.begin(details(rxdata), &Serial); //Get the Easy Transfer Library happening through the Serial
   ETout.begin(details(txdata), &Serial);
   lcd.clear();  //make sure screen is clear again.
-  lcd.setCursor(0,0);  //Move cursor to top left corner
-  lcd.print("Ready");  
+  lcd.setCursor(0, 0); //Move cursor to top left corner
+  lcd.print("Ready");
 
   // setup on screen display
   tv.begin(PAL, W, H);
@@ -209,43 +198,43 @@ void loop()
 {
   txdata.changed = false; // TODO: PID TUNING HELPER
   ps2x.read_gamepad(); //This needs to be called at least once a second
-                        // to get data from the controller.
-  if(ps2x.Button(PSB_PAD_UP))  //Pressed and held
+  // to get data from the controller.
+  if (ps2x.Button(PSB_PAD_UP)) //Pressed and held
   {
     txdata.CamPitch = txdata.CamPitch + 2; //increase the camera pitch
   }
 
-  if(ps2x.ButtonPressed(PSB_PAD_LEFT))  //Pressed
+  if (ps2x.ButtonPressed(PSB_PAD_LEFT)) //Pressed
   {
     txdata.LEDHdlts = !txdata.LEDHdlts; //Toggle the LED light flag
   }
 
 
-  if(ps2x.Button(PSB_PAD_DOWN))  //Pressed and Held
+  if (ps2x.Button(PSB_PAD_DOWN)) //Pressed and Held
   {
     txdata.CamPitch = txdata.CamPitch - 2; //decrease the camera pitch
   }
-  txdata.CamPitch = constrain(txdata.CamPitch,20,160);  //Constrain the camera pitch
-     //to within range servo can handle.
+  txdata.CamPitch = constrain(txdata.CamPitch, 20, 160); //Constrain the camera pitch
+  //to within range servo can handle.
 
-  if(ps2x.Button(PSB_PAD_RIGHT))  //Pressed and Held
+  if (ps2x.Button(PSB_PAD_RIGHT)) //Pressed and Held
   {
     DispOpt = DispOpt + 1; //step through the data to display.
-    if(DispOpt == 2) //At the moment there are only two items of
-    //data to display.  This will need to be changed as extra data is added
-    //This just resets the data to be displayed to the start of the list.
+    if (DispOpt == 2) //At the moment there are only two items of
+      //data to display.  This will need to be changed as extra data is added
+      //This just resets the data to be displayed to the start of the list.
     {
       DispOpt = 0;
     }
   }
 
-  if(ps2x.ButtonPressed(PSB_GREEN))  //Triangle pressed
+  if (ps2x.ButtonPressed(PSB_GREEN)) //Triangle pressed
   {
     txdata.CamRec = !txdata.CamRec; //Toggle the Camera recording Status
   }
 
 
-  if(ps2x.ButtonPressed(PSB_RED))  //Circle pressed
+  if (ps2x.ButtonPressed(PSB_RED)) //Circle pressed
   {
     txdata.CamPhotoShot = true;  //Set to indicate photo shot taken.
   }
@@ -255,116 +244,116 @@ void loop()
   YawLeftVal = ps2x.Analog(PSS_RX);
   UpVal = ps2x.Analog(PSS_LY);
   RollLeftVal = ps2x.Analog(PSS_LX);
-  
+
   //Translate the Stick readings to servo instructions
   //Readings from PS2 Controller Sticks are from 0 to 255
   //with the neutral being 128.  The zero positions are to
   //the left for X-axis movements and up for Y-axis movements.
 
   //Variables to carry the actual raw data for the ESCs
-  txdata.upLraw = (128-UpVal)-(128-RollLeftVal)/2;  //This will be up to a value of 192 
-  txdata.upRraw = (128-UpVal)+(128-RollLeftVal)/2;  //This will be up to a value of 192
-  txdata.HLraw = -(128-ForwardVal)+(128-YawLeftVal);  //This will be up to a value of 256
-  txdata.HRraw = -(128-ForwardVal)-(128-YawLeftVal);  //This will be up to a value of 256
+  txdata.upLraw = (128 - UpVal) - (128 - RollLeftVal) / 2; //This will be up to a value of 192
+  txdata.upRraw = (128 - UpVal) + (128 - RollLeftVal) / 2; //This will be up to a value of 192
+  txdata.HLraw = -(128 - ForwardVal) + (128 - YawLeftVal); //This will be up to a value of 256
+  txdata.HRraw = -(128 - ForwardVal) - (128 - YawLeftVal); //This will be up to a value of 256
 
   //Scale the values to be suitable for ESCs and Servos
   // These values will be able to be written directly to the ESCs and Servos
-  txdata.upLraw=map(txdata.upLraw,-193,193,0,179);
-  txdata.upRraw=map(txdata.upRraw,-193,198,0,179);
-  txdata.HLraw=map(txdata.HLraw,-256,256,0,179);
-  txdata.HRraw=map(txdata.HRraw,-256,256,0,179); 
+  txdata.upLraw = map(txdata.upLraw, -193, 193, 0, 179);
+  txdata.upRraw = map(txdata.upRraw, -193, 198, 0, 179);
+  txdata.HLraw = map(txdata.HLraw, -256, 256, 0, 179);
+  txdata.HRraw = map(txdata.HRraw, -256, 256, 0, 179);
 
 
 
-  // Send the message to the serial port for the ROV Arduino  
-   ETout.sendData();
+  // Send the message to the serial port for the ROV Arduino
+  ETout.sendData();
 
- //Based on Bill Porter's example for the Two Way Easy Transfer Library
- //We will include a loop here to make sure the receive part of the
- //process runs smoothly.
-  for(int i=0; i<5; i++){
+  //Based on Bill Porter's example for the Two Way Easy Transfer Library
+  //We will include a loop here to make sure the receive part of the
+  //process runs smoothly.
+  for (int i = 0; i < 5; i++) {
     ETin.receiveData();
 
-    if(rxdata.BattVolt < LowBatVolts10)  //The factor of 10 is included to 
-    // match the factor of 10 used in the reported value which is an int multiplied
-    //by 10 to give 0.1 precision to the value.  Make sense?
+    if (rxdata.BattVolt < LowBatVolts10) //The factor of 10 is included to
+      // match the factor of 10 used in the reported value which is an int multiplied
+      //by 10 to give 0.1 precision to the value.  Make sense?
     {
-      digitalWrite(VwarnLEDpin,HIGH);  //If the battery voltage too low,
-                                       //trigger the warning LED
+      digitalWrite(VwarnLEDpin, HIGH); //If the battery voltage too low,
+      //trigger the warning LED
     }
     else
     {
-      digitalWrite(VwarnLEDpin,LOW);  //Otherwise if voltage above the 
-                                      //defined low voltage threshhold
-                                      //leave the LED off.
+      digitalWrite(VwarnLEDpin, LOW); //Otherwise if voltage above the
+      //defined low voltage threshhold
+      //leave the LED off.
     }
-    ROVTMP = (rxdata.ROVTemp * 0.004882814-0.5)*100; //converts the 0-1024 
-                                                      //data value into temperature.
-    if(ROVTMP > 50)
+    ROVTMP = (rxdata.ROVTemp * 0.004882814 - 0.5) * 100; //converts the 0-1024
+    //data value into temperature.
+    if (ROVTMP > 50)
     {
-      digitalWrite(TwarnLEDpin,HIGH);  //If the Interior temp too high (over 50 degC),
-                                       //trigger the warning LED
+      digitalWrite(TwarnLEDpin, HIGH); //If the Interior temp too high (over 50 degC),
+      //trigger the warning LED
     }
     else
     {
-      digitalWrite(TwarnLEDpin,LOW);  //Otherwise if interior temperature within the 
-                                      //acceptable level, leave the LED off.
+      digitalWrite(TwarnLEDpin, LOW); //Otherwise if interior temperature within the
+      //acceptable level, leave the LED off.
     }
 
-    if(DispOpt == 1)
+    if (DispOpt == 1)
     {
       lcd.clear();  //A nice clean screen with no remnants from previous
-                    //messages.
-      lcd.setCursor(0,0); //Top left hand corner
+      //messages.
+      lcd.setCursor(0, 0); //Top left hand corner
       lcd.print("ROV Volts:");
-      lcd.setCursor(0,1); //Bottom left corner
+      lcd.setCursor(0, 1); //Bottom left corner
       lcd.print("ROV Temp:");
-      lcd.setCursor(11,0);
-      lcd.print(float(rxdata.BattVolt)/10,1); //factor of 10 used to get
-        //extra precision from Integer value and then displayed to 1 decimal place.
-      lcd.setCursor(11,1);
+      lcd.setCursor(11, 0);
+      lcd.print(float(rxdata.BattVolt) / 10, 1); //factor of 10 used to get
+      //extra precision from Integer value and then displayed to 1 decimal place.
+      lcd.setCursor(11, 1);
       lcd.print(ROVTMP); // Display the ROV temperature
     }
     else
     {
       lcd.clear();  //A nice clean screen with no remnants from previous
-                    //messages.      lcd.setCursor(0,0); //Top left hand corner
+      //messages.      lcd.setCursor(0,0); //Top left hand corner
       lcd.print("Depth:");
-      lcd.setCursor(0,1); //Bottom left corner
+      lcd.setCursor(0, 1); //Bottom left corner
       lcd.print("Heading:");
-      lcd.setCursor(11,0);
+      lcd.setCursor(11, 0);
       lcd.print(rxdata.ROVDepth); //Display ROV depth in metres
-      lcd.setCursor(11,1);
+      lcd.setCursor(11, 1);
       lcd.print(rxdata.ROVHDG);  //Display ROV heading in degrees.
 
     }
     delay(18);
   }
 
-// Signalling the probable status of the camera using LEDs.
+  // Signalling the probable status of the camera using LEDs.
 
-  if(txdata.CamPhotoShot && !PhotoActive)
+  if (txdata.CamPhotoShot && !PhotoActive)
   {
     PhotoSignalRunTime = millis();  //Set the start time for the signal
-    digitalWrite(grnLEDpin,HIGH);
+    digitalWrite(grnLEDpin, HIGH);
     PhotoActive = true;  //record that the photo has been triggered
   }
-  if(txdata.CamPhotoShot && PhotoActive && millis() - PhotoSignalRunTime > 2000)  //See if the trigger
- // signal has been running for two seconds
+  if (txdata.CamPhotoShot && PhotoActive && millis() - PhotoSignalRunTime > 2000) //See if the trigger
+    // signal has been running for two seconds
   {
-    digitalWrite(grnLEDpin,LOW);
+    digitalWrite(grnLEDpin, LOW);
     txdata.CamPhotoShot = false; //Set the camera trigger to off
     PhotoActive = false;  // record that the photosignal has finished.
   }
 
-  digitalWrite(redLEDpin,txdata.CamRec); //Light the redLED based on camera recording status flag
-  digitalWrite(yelLEDpin,txdata.LEDHdlts); //Light the LED based on headlights status flag
+  digitalWrite(redLEDpin, txdata.CamRec); //Light the redLED based on camera recording status flag
+  digitalWrite(yelLEDpin, txdata.LEDHdlts); //Light the LED based on headlights status flag
   delay(18);
 
-  onScreenDisplay();
+  updateOnScreenDisplay();
 
   // TODO: remove after testing
-   // adjust PID values
+  // adjust PID values
   if (Serial.available()) {
     char ch = Serial.read();
     if (ch == 'x') {
@@ -375,59 +364,14 @@ void loop()
 
 // ON SCREEN DISPLAY CODE
 
-void onScreenDisplay(){
-  angle = angledeg * 180.0 / PI;
+void updateOnScreenDisplay() {
   tv.fill(0);
   drawGraph();
-  if (angle == 0.0)
-  {
-    drawLine(centrex, originy, centrex, originy - linelen);
-  }
-  else if (angle > 0.0)
-  {
-    x = cos(angle) * (double)linelen;
-    y = sin(angle) * (double)linelen;
-    drawLine(centrex, originy, centrex - (int)x, originy - (int)y);
-  }
-
-  else if (angle < 0.0)
-  {
-    x = cos(abs(angle)) * (double)linelen;
-    y = sin(abs(angle)) * (double)linelen;
-    drawLine(centrex, originy, centrex + (int)x, originy - (int)y);
-  }
-  angledeg = angledeg + 1.0;
-  if (angledeg > 90.0) {
-    angledeg = -90.0;
-  }
-
-  drawBattery();
-  battery = battery - 10;
-  if (battery == 100) {
-    tv.draw_rect(originx, 15, 10, 5, 1, 1);
-  }
-  else if (battery == 80) {
-    tv.draw_rect(originx, 15, 8, 5, 1, 1);
-  }
-  else if (battery == 60) {
-    tv.draw_rect(originx, 15, 6, 5, 1, 1);
-  }
-  else if (battery == 40) {
-    tv.draw_rect(originx, 15, 4, 5, 1, 1);
-  }
-  else if (battery == 20) {
-    tv.draw_rect(originx, 15, 2, 5, 1, 1);
-  }
-  else if (battery == 0) {
-    tv.draw_rect(originx, 15, 0, 5, 1, 1);
-  }
-  if (battery == 0.0) {
-    battery = 100.0;
-  }
-
-
+  //displayArtificalHorizon(rxdata.AccRoll);
+  displayROVBatteryData(rxdata.BattVolt);
+  displayPodBatteryData(rxdata.PodPower);
+  displayROVTempHigh(rxdata.ROVTemp);
   delay(200);
-  return;
 }
 
 // Initialize ATMega registers for video overlay capability.
@@ -451,20 +395,73 @@ ISR(INT0_vect) {
 }
 
 // DRAWING HELPERS FOR OSD
+
+// Display artificial horizon using IMU data and calculated angles 
+void displayArtificalHorizon(int angledeg){
+   //USE GYRO OR ROVHDG. Need to see what unit is output to format for Angle assignment
+  float angle = angledeg * PI / 180.0;
+  if (angle == 0.0){
+    tv.draw_line(centrex- linelen, originy, centrex+linelen, originy, 1);
+  }else if (angle > 0.0){
+    float x = sin(angle) * (double)linelen;
+    float y = cos(angle) * (double)linelen;
+    tv.draw_line(centrex + (int)x , originy + (int)y, centrex - (int)x, originy - (int)y, 1);
+  }else if (angle < 0.0){
+    float x = sin(abs(angle)) * (double)linelen;
+    float y = cos(abs(angle)) * (double)linelen;
+    tv.draw_line(centrex - (int)x, originy + (int)y, centrex + (int)x, originy - (int)y, 1);
+  }
+}
+
+// ROV Battery Update
+void displayROVBatteryData(int volts) {
+  drawBattery(15, 10, 5, 1);
+  tv.draw_rect(originx, 15, (int)volts, 5, 1, 1);  // TODO: Rescale volts
+
+  // if ROV battery low, print message
+  if (volts < LowBatVolts10) {
+    tv.print(20, 20, "ROV BATTERY LOW");
+  } else {
+    tv.print(20, 20, "");
+  }
+}
+
+// Pod Battery Update
+void displayPodBatteryData(int watts) {
+  drawBattery(8, 10, 5, 1);
+  tv.draw_rect(originx, 8, (int)watts, 5, 1, 1); // TODO: Rescale watts
+  
+  // if pod battery low, print message
+  if (watts < LowPodVolts10) { 
+    tv.print(20, 30, "POD BATTERY LOW");
+  } else {
+    tv.print(20, 30, "");
+  }
+}
+
+// If temp to high, print message
+void displayROVTempHigh(int temp) {
+  ROVTMP = (temp * 0.004882814 - 0.5) * 100; //converts the 0-1024
+  //data value into temperature.
+  if (ROVTMP > 50) {
+    tv.print(20, 40, "ROV TEMP HIGH");
+  } else {
+    tv.print(20, 40, "");
+  }
+}
+
 void drawGraph() {
   tv.draw_line(originx, originy, 120, originy, 1);
   tv.draw_circle(60, originy, 15, WHITE, -1);
 }
 
-void drawBattery(){
-  tv.draw_rect(originx,15,10,5,1, -1);
+void drawBattery(int x0, int y0, int x1, int y1) {
+  tv.draw_rect(originx, x0, y0, x1, y1, -1);
 }
 
-void drawLine(int x0, int y0, int x1, int y1) {
-  tv.draw_line(x0, y0, x1, y1, 1);
-}
+// PID TUNING CODE
 
-void changeParams(){
+void changeParams() {
   txdata.changed = true;
   Serial.print("CD: ");
   Serial.println(rxdata.cD);
