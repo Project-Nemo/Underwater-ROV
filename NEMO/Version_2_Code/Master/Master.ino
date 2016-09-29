@@ -367,7 +367,8 @@ void loop()
 void updateOnScreenDisplay() {
   tv.fill(0);
   drawGraph();
-  //displayArtificalHorizon(rxdata.AccRoll);
+  int angle = rxdata.AccRoll;
+  displayHorizon(angle);
   displayROVBatteryData(rxdata.BattVolt);
   displayPodBatteryData(rxdata.PodPower);
   displayROVTempHigh(rxdata.ROVTemp);
@@ -395,21 +396,19 @@ ISR(INT0_vect) {
 }
 
 // DRAWING HELPERS FOR OSD
-
-// Display artificial horizon using IMU data and calculated angles 
-void displayArtificalHorizon(int angledeg){
-   //USE GYRO OR ROVHDG. Need to see what unit is output to format for Angle assignment
-  float angle = angledeg * PI / 180.0;
-  if (angle == 0.0){
-    tv.draw_line(centrex- linelen, originy, centrex+linelen, originy, 1);
-  }else if (angle > 0.0){
+// Display artificial horizon using IMU data and calculated angles
+void displayHorizon(int angle){
+  float angleDeg = angle * PI / 180.0;    //USE GYRO OR ROVHDG. Need to see what unit is output to format for Angle assignment
+  if (angleDeg == 0.0){
+    tv.draw_line(centrex - linelen, originy, centrex+linelen, originy, 1);
+  } else if (angle > 0.0){
     float x = sin(angle) * (double)linelen;
     float y = cos(angle) * (double)linelen;
     tv.draw_line(centrex + (int)x , originy + (int)y, centrex - (int)x, originy - (int)y, 1);
-  }else if (angle < 0.0){
-    float x = sin(abs(angle)) * (double)linelen;
-    float y = cos(abs(angle)) * (double)linelen;
-    tv.draw_line(centrex - (int)x, originy + (int)y, centrex + (int)x, originy - (int)y, 1);
+  } else if (angle < 0.0){
+//    float x = sin(abs(angle)) * (double)linelen;
+//    float y = cos(abs(angle)) * (double)linelen;
+//    tv.draw_line(centrex - (int)x, originy + (int)y, centrex + (int)x, originy - (int)y, 1);
   }
 }
 
