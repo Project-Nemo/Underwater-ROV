@@ -64,7 +64,6 @@
 #include <EasyTransfer.h> // Bill Porter's Easy Transfer Library
 #include <LiquidCrystal.h>
 #include <TVout.h>
-#include <video_gen.h>
 #include <fontALL.h>
 
 #define W 136          // on screen display width and height

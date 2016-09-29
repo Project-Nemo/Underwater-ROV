@@ -97,6 +97,29 @@ struct RECEIVE_DATA_STRUCTURE{
   int ROVTemp; //ROV interior temperature back from the ROV
   int ROVDepth; //ROV depth reading (m)
   int ROVHDG;  //ROV direction (Degrees)
+  // accelerometer x, y, z values
+  int AccX;
+  int AccY;
+  int AccZ;
+  // gyroscope x, y, z values
+  int GyroX;
+  int GyroY;
+  int GyroZ;
+  int AccRoll;
+  int AccPitch;
+  int PodPower;
+  int PodState;
+
+  // for tuning PID
+  int cP;
+  int cD;
+  int cI;
+  int pidScale;
+  int pidShift;
+  int low_bound;
+  int high_bound;
+
+  String sensorData;
 };
 
 struct SEND_DATA_STRUCTURE{
@@ -108,6 +131,16 @@ struct SEND_DATA_STRUCTURE{
   volatile boolean CamPhotoShot; // Camera photo trigger signal
   volatile boolean CamRec;  //Camera record function toggle
   volatile boolean LEDHdlts; //LED headlights on/off toggle
+
+  // for tuning PID
+  int cP;
+  int cD;
+  int cI;
+  int pidScale;
+  int pidShift;
+  int low_bound;
+  int high_bound;
+  volatile boolean changed;
 };
 
 //give a name to the group of data
@@ -145,6 +178,7 @@ void setup()
 
 void loop()
 {
+  txdata.changed = false; // TODO: PID TUNING HELPER
   ps2x.read_gamepad(); //This needs to be called at least once a second
                         // to get data from the controller.
   if(ps2x.Button(PSB_PAD_UP))  //Pressed and held
@@ -297,4 +331,54 @@ void loop()
   digitalWrite(redLEDpin,txdata.CamRec); //Light the redLED based on camera recording status flag
   digitalWrite(yelLEDpin,txdata.LEDHdlts); //Light the LED based on headlights status flag
   delay(18);
+
+  Serial.println("Sensor:");
+  Serial.println(rxdata.sensorData);
+
+   // adjust PID values
+  if (Serial.available()) {
+    char ch = Serial.read();
+    if (ch == 'x') {
+      changeParams();
+    }
+  }
+}
+
+void changeParams(){
+  txdata.changed = true;
+  Serial.print("CD: ");
+  Serial.println(rxdata.cD);
+  while (!Serial.available()) {
+  }
+  txdata.cD = Serial.parseFloat();
+  Serial.print("CI: ");
+  Serial.println(rxdata.cI);
+  while (!Serial.available()) {
+  }
+  txdata.cI = Serial.parseFloat();
+  Serial.print("CP: ");
+  Serial.print(rxdata.cP);
+  while (!Serial.available()) {
+  }
+  txdata.cP = Serial.parseFloat();
+  Serial.print("PIDScale ");
+  Serial.print(rxdata.pidScale);
+  while (!Serial.available()) {
+  }
+  txdata.pidScale = Serial.parseFloat();
+  Serial.print("PIDShift ");
+  Serial.print(rxdata.pidShift);
+  while (!Serial.available()) {
+  }
+  txdata.pidShift = Serial.parseFloat();
+  Serial.print("Low Bound ");
+  Serial.print(rxdata.low_bound);
+  while (!Serial.available()) {
+  }
+  txdata.low_bound = Serial.parseFloat();
+  Serial.print("High Bound ");
+  Serial.print(rxdata.high_bound);
+  while (!Serial.available()) {
+  }
+  txdata.high_bound = Serial.parseFloat();
 }

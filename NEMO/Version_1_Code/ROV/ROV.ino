@@ -372,8 +372,6 @@ void loop() {
   }
 
   // read acceleration and gyroscope values
-  read_IMU();
-  pid();
   txdata.cD = cD;
   txdata.cP = cP;
   txdata.cI = cI;
@@ -382,10 +380,10 @@ void loop() {
   txdata.low_bound = low_bound;
   txdata.high_bound = high_bound;
 
-  // trigger station keeping code if throttles on PS2 controller are not being moved
-  // assumes 0 is not moving value.
+  read_IMU();
+  pid();
   if(isNotControllingROV(rxdata.upLraw, rxdata.upRraw, rxdata.HLraw, rxdata.HRraw, 0)){
-     stationKeepRoll();
+       stationKeepRoll();
   }
 }
 
