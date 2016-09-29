@@ -5,28 +5,22 @@
   This sketch takes control commands from a PS2 handset and transmits the
   commands using Bill Porter's EasyTransfer Library over a 9600 baud serial
   link (100m tether).
-
   This sketch is designed for an Arduino Nano with only one Serial Port.
-
   Pin assignments are:
-
   3.3V output to PS2 red Pin
   Pin D10 to PS2 yellow pin
   Pin D11 to PS2 orange pin
   Pin D12 to PS2 brown pin
   Pin D13 to PS2 blue pin
-
   Pin D2 to LED Camera Photo Trigger Indicator
   Pin D3 to LED Camera Record Indicator
   Pin D4 to LED Main Lights Indicator
   Pin D5 to LED ROV Battery Low Voltage Warning
   Pin D6 to LED ROV Interior high temperature warning
-
   Communications
   Serial Connection: Topside D1 (TX) to ROV D0 (RX)
   Serial Connection: Topside D0 (RX) to ROV D1 (TX)
   Connect the GND on both
-
   A 16x2 LCD screen is connected as follows
   VSS to GND
   VDD to 5V output of MC78T05CT regulator
@@ -40,14 +34,11 @@
   D7 to Arduino Nano pin A5
   A to 5V output of MC78T05CT regulator
   K to GND via a 330ohm resistor
-
   5V is supplied from a regulator to the 1Kohm pull up resistors
   for PS2 as well as the LCD screen and it's backlight
-
   The coding pulls on the PSX library developed by Bill Porter.
   See www.billporter.info for the latest from Bill Porter and to
   download the library.
-
   The controls for the ROV are;
   Left Stick - X-axis = Roll, Y-axis = Up/down
   Right Stick - X-axis = Yaw, Y-axis = forward/back
@@ -372,6 +363,7 @@ void updateOnScreenDisplay() {
   displayROVBatteryData(rxdata.BattVolt);
   displayPodBatteryData(rxdata.PodPower);
   displayROVTempHigh(rxdata.ROVTemp);
+  tv.print(30,8,rxdata.ROVDepth);
   delay(200);
 }
 
@@ -397,25 +389,28 @@ ISR(INT0_vect) {
 
 // DRAWING HELPERS FOR OSD
 // Display artificial horizon using IMU data and calculated angles
+//angles calculated from -90deg to +90deg
 void displayHorizon(int angle){
-  float angleDeg = angle * PI / 180.0;    //USE GYRO OR ROVHDG. Need to see what unit is output to format for Angle assignment
-  if (angleDeg == 0.0){
+  //For testing purposes
+  //int angleDeg = 0;
+  //angle = angleDeg * PI / 180.0;   
+  float x = sin(abs(angle)) * (double)linelen;
+  float y = cos(abs(angle)) * (double)linelen;
+   if (angle== 0.0){
     tv.draw_line(centrex - linelen, originy, centrex+linelen, originy, 1);
-  } else if (angle > 0.0){
-    float x = sin(angle) * (double)linelen;
-    float y = cos(angle) * (double)linelen;
+  } else if (angle > 0.0){   
     tv.draw_line(centrex + (int)x , originy + (int)y, centrex - (int)x, originy - (int)y, 1);
-  } else if (angle < 0.0){
-//    float x = sin(abs(angle)) * (double)linelen;
-//    float y = cos(abs(angle)) * (double)linelen;
-//    tv.draw_line(centrex - (int)x, originy + (int)y, centrex + (int)x, originy - (int)y, 1);
+  } else if (angle < 0.0){   
+    tv.draw_line(centrex - (int)x, originy + (int)y, centrex + (int)x, originy - (int)y, 1);
   }
 }
 
 // ROV Battery Update
 void displayROVBatteryData(int volts) {
-  drawBattery(15, 10, 5, 1);
-  tv.draw_rect(originx, 15, (int)volts, 5, 1, 1);  // TODO: Rescale volts
+  float range = 125.0 - 90.0; //may need to characterise further (these are approx according to website)
+  float volts2 = ((float)volts-90/range);
+  drawBattery(15, 10, 10, 1);
+  tv.draw_rect(originx, 15, (int)volts2, 10, 1, 1);  // TODO: Rescale volts
 
   // if ROV battery low, print message
   if (volts < LowBatVolts10) {
@@ -427,14 +422,14 @@ void displayROVBatteryData(int volts) {
 
 // Pod Battery Update
 void displayPodBatteryData(int watts) {
-  drawBattery(8, 10, 5, 1);
-  tv.draw_rect(originx, 8, (int)watts, 5, 1, 1); // TODO: Rescale watts
+  drawBattery(15, 12, 10, 1);
+  tv.draw_rect(originx, 8, (int)watts, 5, 1, 1); // TODO: Rescale watts (need voltages)
   
   // if pod battery low, print message
   if (watts < LowPodVolts10) { 
-    tv.print(20, 30, "POD BATTERY LOW");
+    tv.print(20, 25, "POD BATTERY LOW");
   } else {
-    tv.print(20, 30, "");
+    tv.print(20, 25, "");
   }
 }
 
@@ -442,10 +437,11 @@ void displayPodBatteryData(int watts) {
 void displayROVTempHigh(int temp) {
   ROVTMP = (temp * 0.004882814 - 0.5) * 100; //converts the 0-1024
   //data value into temperature.
+  tv.print(15, 15, ROVTMP);
   if (ROVTMP > 50) {
-    tv.print(20, 40, "ROV TEMP HIGH");
+    tv.print(20, 30, "ROV TEMP HIGH");
   } else {
-    tv.print(20, 40, "");
+    tv.print(20, 30, "");
   }
 }
 
