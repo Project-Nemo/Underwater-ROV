@@ -67,6 +67,9 @@ Circle = Take photo
 #include <fontALL.h>
 #include <video_gen.h>
 
+#define W 136    // width of screen for osd
+#define H 96     // height of screen for osd
+
 TVout tv;   // On Screen Display screen variable
 PS2X ps2x;  //The PS2 Controller Class
 EasyTransfer ETin, ETout;  //Create the two Easy transfer Objects for
@@ -96,10 +99,19 @@ volatile boolean PhotoActive = false;  // A flag to show that the camera signal 
 unsigned char originx = 5;     // start x position for on screen display
 unsigned char originy = 80;    // start y position for on screen display
 unsigned char centrex = 60;
-int width = 136;              // on screen display width and height
-int height = 96;
 int linelen = 16;
 float angledeg = -90.0 ;
+
+char s[32];
+unsigned int n = 0;
+int index = 0;
+double x;
+double y;
+int messageLen = 32;
+char message[] = "";
+char saveChar;
+float angle ;
+int battery = 100;
 
 struct RECEIVE_DATA_STRUCTURE{
   int BattVolt;  //Battery Voltage message from the ROV.
@@ -183,12 +195,14 @@ void setup()
   lcd.setCursor(0,0);  //Move cursor to top left corner
   lcd.print("Ready");  
 
-  // on screen display setup
-  tv.begin(PAL, width, height);
+  // setup on screen display
+  tv.begin(PAL, W, H);
   tv.delay(500);
   initOverlay();
   tv.select_font(font6x8);
   tv.fill(0);
+  drawGraph();
+  randomSeed(analogRead(0));
 }
 
 void loop()
@@ -347,6 +361,8 @@ void loop()
   digitalWrite(yelLEDpin,txdata.LEDHdlts); //Light the LED based on headlights status flag
   delay(18);
 
+  onScreenDisplay();
+
   // TODO: remove after testing
    // adjust PID values
   if (Serial.available()) {
@@ -359,10 +375,93 @@ void loop()
 
 // ON SCREEN DISPLAY CODE
 
+void onScreenDisplay(){
+  angle = angledeg * 180.0 / PI;
+  tv.fill(0);
+  drawGraph();
+  if (angle == 0.0)
+  {
+    drawLine(centrex, originy, centrex, originy - linelen);
+  }
+  else if (angle > 0.0)
+  {
+    x = cos(angle) * (double)linelen;
+    y = sin(angle) * (double)linelen;
+    drawLine(centrex, originy, centrex - (int)x, originy - (int)y);
+  }
+
+  else if (angle < 0.0)
+  {
+    x = cos(abs(angle)) * (double)linelen;
+    y = sin(abs(angle)) * (double)linelen;
+    drawLine(centrex, originy, centrex + (int)x, originy - (int)y);
+  }
+  angledeg = angledeg + 1.0;
+  if (angledeg > 90.0) {
+    angledeg = -90.0;
+  }
+
+  drawBattery();
+  battery = battery - 10;
+  if (battery == 100) {
+    tv.draw_rect(originx, 15, 10, 5, 1, 1);
+  }
+  else if (battery == 80) {
+    tv.draw_rect(originx, 15, 8, 5, 1, 1);
+  }
+  else if (battery == 60) {
+    tv.draw_rect(originx, 15, 6, 5, 1, 1);
+  }
+  else if (battery == 40) {
+    tv.draw_rect(originx, 15, 4, 5, 1, 1);
+  }
+  else if (battery == 20) {
+    tv.draw_rect(originx, 15, 2, 5, 1, 1);
+  }
+  else if (battery == 0) {
+    tv.draw_rect(originx, 15, 0, 5, 1, 1);
+  }
+  if (battery == 0.0) {
+    battery = 100.0;
+  }
+
+
+  delay(200);
+  return;
+}
+
 // Initialize ATMega registers for video overlay capability.
 // Must be called after tv.begin().
 void initOverlay() {
-  
+  TCCR1A = 0;
+  // Enable timer1.  ICES0 is set to 0 for falling edge detection on input capture pin.
+  TCCR1B = _BV(CS10);
+
+  // Enable input capture interrupt
+  TIMSK1 |= _BV(ICIE1);
+
+  // Enable external interrupt INT0 on pin 2 with falling edge.
+  EIMSK = _BV(INT0);
+  EICRA = _BV(ISC01);
+}
+
+// Required to reset the scan line when the vertical sync occurs
+ISR(INT0_vect) {
+  display.scanLine = 0;
+}
+
+// DRAWING HELPERS FOR OSD
+void drawGraph() {
+  tv.draw_line(originx, originy, 120, originy, 1);
+  tv.draw_circle(60, originy, 15, WHITE, -1);
+}
+
+void drawBattery(){
+  tv.draw_rect(originx,15,10,5,1, -1);
+}
+
+void drawLine(int x0, int y0, int x1, int y1) {
+  tv.draw_line(x0, y0, x1, y1, 1);
 }
 
 void changeParams(){
