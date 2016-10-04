@@ -119,7 +119,9 @@ int leftVal;
 int rightVal;
 int low_bound = -10;
 int high_bound = 10;
-int neutral = 90;    // stable position of PS2 throttle 
+
+// 0 when not communicating with master, 90 when completely connect
+int neutral = 0;    // stable position of PS2 throttle   
 
 float MS5803Press;  //Pressure from the MS5803 Sensor.
 float MS5803Temp;  //Temperature from the MS5803 Sensor.
@@ -404,31 +406,30 @@ void changeParams(){
   while (!Serial.available()) {
   }
   cD = Serial.parseFloat();
+  
   Serial.print("CI: ");
   Serial.println(cI);
   while (!Serial.available()) {
   }
   cI = Serial.parseFloat();
+  
   Serial.print("CP: ");
   Serial.print(cP);
   while (!Serial.available()) {
   }
   cP = Serial.parseFloat();
-  Serial.print("PID ");
-  Serial.print(PID);
-  while (!Serial.available()) {
-  }
-  PID = Serial.parseFloat();
-  Serial.print("PIDScale ");
-  Serial.print(PIDScale);
-  while (!Serial.available()) {
-  }
-  PIDScale = Serial.parseFloat();
-  Serial.print("PIDShift ");
-  Serial.print(PIDShift);
-  while (!Serial.available()) {
-  }
-  PIDShift = Serial.parseFloat();
+//  
+//  Serial.print("PIDScale ");
+//  Serial.print(PIDScale);
+//  while (!Serial.available()) {
+//  }
+//  PIDScale = Serial.parseFloat();
+//  
+//  Serial.print("PIDShift ");
+//  Serial.print(PIDShift);
+//  while (!Serial.available()) {
+//  }
+//  PIDShift = Serial.parseFloat();
 }
 
 
@@ -477,6 +478,7 @@ void pid(){
   // transform right thruster value to equivalent opposite value of left thruster
   int diff = 90 - leftVal;
   rightVal = 90 + diff;
+
 }
 
   //    - <- -> +
@@ -497,8 +499,16 @@ void stationKeepRoll() {
   // if the angle is between -10 and 10
   // Send values to thruster
   if(txdata.AccRoll < low_bound || txdata.AccRoll > high_bound){
+  Serial.println("");
+  Serial.print("Left Value: ");
+  Serial.println(leftVal);
+//  Serial.print("Right Value: ");
+//  Serial.println(rightVal);
    ESCVL.write(leftVal);
    ESCVR.write(rightVal);
+  } else {
+    ESCVL.write(90);
+    ESCVR.write(90);
   }
 }
 
@@ -522,7 +532,7 @@ void read_IMU(){
   // if the ptich is  negative value, the roll is on the left side
   // roll is now any value between 0 to 90 to 0.
   // negative rolling to the left, positive to the right
-  if(accPitch < 0){
+  if(accPitch > 0){
     // will give a value between -90 and 0, -90 being the horizontal on the left and 0 being the neutral
     txdata.AccRoll = accRoll - 90; 
   } else {
@@ -532,22 +542,22 @@ void read_IMU(){
 
 
   // TODO remove after testing
-  Serial.println("");
-  Serial.print("Accel Pitch: ");
-  Serial.println(accPitch);
-  Serial.print("Accel Roll: ");
-  Serial.println(txdata.AccRoll);
-  Serial.print("Acc: ");
-  Serial.print(acc.x_axis);
-  Serial.print(", ");
-  Serial.print(acc.y_axis);
-  Serial.print(", ");
-  Serial.println(acc.z_axis);
-  Serial.print("Gyro: ");
-  Serial.print(gyr.x_axis);
-  Serial.print(", ");
-  Serial.print(gyr.y_axis);
-  Serial.print(", ");
-  Serial.println(gyr.z_axis);
-  Serial.println("");
+//  Serial.println("");
+//  Serial.print("Accel Pitch: ");
+//  Serial.println(accPitch);
+//  Serial.print("Accel Roll: ");
+//  Serial.println(txdata.AccRoll);
+//  Serial.print("Acc: ");
+//  Serial.print(acc.x_axis);
+//  Serial.print(", ");
+//  Serial.print(acc.y_axis);
+//  Serial.print(", ");
+//  Serial.println(acc.z_axis);
+//  Serial.print("Gyro: ");
+//  Serial.print(gyr.x_axis);
+//  Serial.print(", ");
+//  Serial.print(gyr.y_axis);
+//  Serial.print(", ");
+//  Serial.println(gyr.z_axis);
+//  Serial.println("");
 }
