@@ -259,6 +259,70 @@ void TVout::print(uint8_t x, uint8_t y, double n, int digits) {
 	print(n,digits);
 }
 
+void TVout::println(uint8_t x, uint8_t y, const char c[])
+{
+	cursor_x = x;
+	cursor_y = y;
+	print(c);
+	println();
+}
+
+void TVout::println(uint8_t x, uint8_t y, char c, int base)
+{
+	cursor_x = x;
+	cursor_y = y;
+	print(c, base);
+	println();
+}
+
+void TVout::println(uint8_t x, uint8_t y, unsigned char b, int base)
+{
+	cursor_x = x;
+	cursor_y = y;
+	print(b, base);
+	println();
+}
+
+void TVout::println(uint8_t x, uint8_t y, int n, int base)
+{
+	cursor_x = x;
+	cursor_y = y;
+	print(n, base);
+	println();
+}
+
+void TVout::println(uint8_t x, uint8_t y, unsigned int n, int base)
+{
+	cursor_x = x;
+	cursor_y = y;
+	print(n, base);
+	println();
+}
+
+void TVout::println(uint8_t x, uint8_t y, long n, int base)
+{
+	cursor_x = x;
+	cursor_y = y;
+	print(n, base);
+	println();
+}
+
+void TVout::println(uint8_t x, uint8_t y, unsigned long n, int base)
+{
+	cursor_x = x;
+	cursor_y = y;
+	print(n, base);
+	println();
+}
+
+void TVout::println(uint8_t x, uint8_t y, double n, int digits)
+{
+	cursor_x = x;
+	cursor_y = y;
+	print(n, digits);
+	println();
+}
+
 void TVout::printNumber(unsigned long n, uint8_t base)
 {
   unsigned char buf[8 * sizeof(long)]; // Assumes 8-bit chars. 
