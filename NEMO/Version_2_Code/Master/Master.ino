@@ -54,18 +54,13 @@
 #include <PS2X_lib.h> // Bill Porter's PS2 Library
 #include <EasyTransfer.h> // Bill Porter's Easy Transfer Library
 #include <LiquidCrystal.h>
-#include <TVout.h>
-#include <fontALL.h>
-#include <video_gen.h>
+#include <SoftwareSerial.h>
 
-#define W 136    // width of screen for osd
-#define H 96     // height of screen for osd
-
-TVout tv;   // On Screen Display screen variable
 PS2X ps2x;  //The PS2 Controller Class
 EasyTransfer ETin, ETout;  //Create the two Easy transfer Objects for
 // Two way communication
 
+SoftwareSerial osdComms(8, 9);  // rx, tx  (only using tx)
 LiquidCrystal lcd(A0, A1, A2, A3, A4, A5); //Pins for the LCD display
 
 const int grnLEDpin = 4;  //green LED is on Digital pin 4
@@ -86,12 +81,6 @@ int DispOpt = 0; //Variable to signal which value to show on the display
 
 long PhotoSignalRunTime = 0; //A variable to carry the time since photo triggered.
 volatile boolean PhotoActive = false;  // A flag to show that the camera signal has been sent.
-
-// On scren display params for displaying values
-unsigned char originx = 5;     // start x position for on screen display
-unsigned char originy = 80;    // start y position for on screen display
-unsigned char centrex = 60;
-int linelen = 16;
 
 struct RECEIVE_DATA_STRUCTURE {
   int BattVolt;  //Battery Voltage message from the ROV.
@@ -175,14 +164,8 @@ void setup()
   lcd.setCursor(0, 0); //Move cursor to top left corner
   lcd.print("Ready");
 
-  // setup on screen display
-  tv.begin(PAL, W, H);
-  tv.delay(500);
-  initOverlay();
-  tv.select_font(font6x8);
-  tv.fill(0);
-  drawGraph();
-  randomSeed(analogRead(0));
+  // setup communications with on screen display hardware
+  osdComms.begin(9600);
 }
 
 void loop()
@@ -341,156 +324,25 @@ void loop()
   digitalWrite(yelLEDpin, txdata.LEDHdlts); //Light the LED based on headlights status flag
   delay(18);
 
-  updateOnScreenDisplay();
-
-  // TODO: remove after testing
-  // adjust PID values
-  if (Serial.available()) {
-    char ch = Serial.read();
-    if (ch == 'x') {
-      changeParams();
-    }
-  }
+  sendDataToOnScreenDisplay();
 }
 
-// ON SCREEN DISPLAY CODE
+void sendDataToOnScreenDisplay() {
+  int angle = rxdata.AccRoll + 90;   // can't send negative values
+  int pod_volts = scaleVolts(rxdata.PodPower);
+  int batt_volts = scaleVolts(rxdata.BattVolt);
+  int temp = (rxdata.ROVTemp * 0.004882814 - 0.5) * 100;
+  int depth = rxdata.ROVDepth;
 
-void updateOnScreenDisplay() {
-  tv.fill(0);
-  drawGraph();
-  int angle = rxdata.AccRoll;
-  displayHorizon(angle);
-  displayROVBatteryData(rxdata.BattVolt);
-  displayPodBatteryData(rxdata.PodPower);
-  displayROVTempHigh(rxdata.ROVTemp);
-  tv.print(30,8,rxdata.ROVDepth);
-  delay(200);
+  // TODO: transfer variables
+  osdComms.write(angle);   
+  osdComms.write(pod_volts);   
+  osdComms.write(batt_volts);   
+  osdComms.write(temp);  
+  osdComms.write(depth);   
 }
 
-// Initialize ATMega registers for video overlay capability.
-// Must be called after tv.begin().
-void initOverlay() {
-  TCCR1A = 0;
-  // Enable timer1.  ICES0 is set to 0 for falling edge detection on input capture pin.
-  TCCR1B = _BV(CS10);
-
-  // Enable input capture interrupt
-  TIMSK1 |= _BV(ICIE1);
-
-  // Enable external interrupt INT0 on pin 2 with falling edge.
-  EIMSK = _BV(INT0);
-  EICRA = _BV(ISC01);
+int scaleVolts(int volt){
+  // TODO: SCALE
 }
 
-// Required to reset the scan line when the vertical sync occurs
-ISR(INT0_vect) {
-  display.scanLine = 0;
-}
-
-// DRAWING HELPERS FOR OSD
-// Display artificial horizon using IMU data and calculated angles
-//angles calculated from -90deg to +90deg
-void displayHorizon(int angle){
-  //For testing purposes
-  //int angleDeg = 0;
-  //angle = angleDeg * PI / 180.0;   
-  float x = sin(abs(angle)) * (double)linelen;
-  float y = cos(abs(angle)) * (double)linelen;
-   if (angle== 0.0){
-    tv.draw_line(centrex - linelen, originy, centrex+linelen, originy, 1);
-  } else if (angle > 0.0){   
-    tv.draw_line(centrex + (int)x , originy + (int)y, centrex - (int)x, originy - (int)y, 1);
-  } else if (angle < 0.0){   
-    tv.draw_line(centrex - (int)x, originy + (int)y, centrex + (int)x, originy - (int)y, 1);
-  }
-}
-
-// ROV Battery Update
-void displayROVBatteryData(int volts) {
-  float range = 125.0 - 90.0; //may need to characterise further (these are approx according to website)
-  float volts2 = ((float)volts-90/range);
-  drawBattery(15, 10, 10, 1);
-  tv.draw_rect(originx, 15, (int)volts2, 10, 1, 1);  // TODO: Rescale volts
-
-  // if ROV battery low, print message
-  if (volts < LowBatVolts10) {
-    tv.print(20, 20, "ROV BATTERY LOW");
-  } else {
-    tv.print(20, 20, "");
-  }
-}
-
-// Pod Battery Update
-void displayPodBatteryData(int watts) {
-  drawBattery(15, 12, 10, 1);
-  tv.draw_rect(originx, 8, (int)watts, 5, 1, 1); // TODO: Rescale watts (need voltages)
-  
-  // if pod battery low, print message
-  if (watts < LowPodVolts10) { 
-    tv.print(20, 25, "POD BATTERY LOW");
-  } else {
-    tv.print(20, 25, "");
-  }
-}
-
-// If temp to high, print message
-void displayROVTempHigh(int temp) {
-  ROVTMP = (temp * 0.004882814 - 0.5) * 100; //converts the 0-1024
-  //data value into temperature.
-  tv.print(15, 15, ROVTMP);
-  if (ROVTMP > 50) {
-    tv.print(20, 30, "ROV TEMP HIGH");
-  } else {
-    tv.print(20, 30, "");
-  }
-}
-
-void drawGraph() {
-  tv.draw_line(originx, originy, 120, originy, 1);
-  tv.draw_circle(60, originy, 15, WHITE, -1);
-}
-
-void drawBattery(int x0, int y0, int x1, int y1) {
-  tv.draw_rect(originx, x0, y0, x1, y1, -1);
-}
-
-// PID TUNING CODE
-
-void changeParams() {
-  txdata.changed = true;
-  Serial.print("CD: ");
-  Serial.println(rxdata.cD);
-  while (!Serial.available()) {
-  }
-  txdata.cD = Serial.parseFloat();
-  Serial.print("CI: ");
-  Serial.println(rxdata.cI);
-  while (!Serial.available()) {
-  }
-  txdata.cI = Serial.parseFloat();
-  Serial.print("CP: ");
-  Serial.print(rxdata.cP);
-  while (!Serial.available()) {
-  }
-  txdata.cP = Serial.parseFloat();
-  Serial.print("PIDScale ");
-  Serial.print(rxdata.pidScale);
-  while (!Serial.available()) {
-  }
-  txdata.pidScale = Serial.parseFloat();
-  Serial.print("PIDShift ");
-  Serial.print(rxdata.pidShift);
-  while (!Serial.available()) {
-  }
-  txdata.pidShift = Serial.parseFloat();
-  Serial.print("Low Bound ");
-  Serial.print(rxdata.low_bound);
-  while (!Serial.available()) {
-  }
-  txdata.low_bound = Serial.parseFloat();
-  Serial.print("High Bound ");
-  Serial.print(rxdata.high_bound);
-  while (!Serial.available()) {
-  }
-  txdata.high_bound = Serial.parseFloat();
-}
