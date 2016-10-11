@@ -1,6 +1,7 @@
 #include <TVout.h>
 #include <fontALL.h>
 #include <video_gen.h>
+#include <avr/pgmspace.h>
 
 // OSD chip cannot handle variables, so need to use defines
 #define W 136    // width of screen for osd
@@ -16,6 +17,15 @@
 #define LINE_LENGTH 16
 #define CENTER_X 60
 
+const char rov[] PROGMEM  = "ROV";
+const char pod[] PROGMEM  =  "POD";
+const char depth[] PROGMEM  = "DEPTH";
+const char temp[] PROGMEM  = "TEMP:";
+const char rovbattlow[] PROGMEM  ="ROV BATTERY LOW";
+const char podbattlow[] PROGMEM  ="POD BATTERY LOW";
+const char* const string_table[] PROGMEM = {rov, pod, temp,depth, rovbattlow, podbattlow}; //To move variables to SRAM 
+char buffer[10];
+
 TVout tv;   // On Screen Display screen variable
 
 // Data to show on display
@@ -25,35 +35,28 @@ int angledeg = 0;
 int pod_volts = 0;
 int batt_volts = 0;
 
-
 void setup() {
   Serial.begin(9600);
   setupOSD();
+  delay(1000);
 } 
 
-
-
 void loop() {
-  delay(1000);
-  if(Serial.available() > 1) {   
+ Serial.end();
+ Serial.begin(9600);
+ delay(1000);
+  if(Serial.available() > 1) { 
     angledeg = Serial.read();
     pod_volts = Serial.read();
     batt_volts = Serial.read();
     temp_val = Serial.read();
     depth_val = Serial.read();
-
-  }
+  }  
   tv.fill(0); 
-  drawGraph();
-  displayROVDepth();
-  displayROVTempHigh();
   displayHorizon();
-  displayROVBatteryData();
-  displayPodBatteryData();
-}
-
-void readValues(){
-  
+  displayROVDepth();
+  displayROVTemp();
+  displayBatteryData();
 }
 
 void setupOSD() {
@@ -82,11 +85,12 @@ ISR(INT0_vect) {
 }
 
 void displayHorizon(){
-  angledeg= temp_val;  
+  tv.draw_line(HORIZON_START_X, HORIZON_START_Y, HORIZON_LENGTH, HORIZON_START_Y, 1);
+  tv.draw_circle(60, HORIZON_START_Y, 15, WHITE, -1);
   angledeg = angledeg - 90; // Value sent will be 90 degress greater than actual angle
   float angle = (angledeg/180.0) *PI;
-  int y = sin(abs(angle)) * LINE_LENGTH;
-  int x = cos(abs(angle)) * LINE_LENGTH;
+  int x = sin(abs(angle)) * LINE_LENGTH;
+  int y = cos(abs(angle)) * LINE_LENGTH;
   if (angledeg == 0){
     tv.draw_line(CENTER_X - LINE_LENGTH, HORIZON_START_Y, CENTER_X + LINE_LENGTH, HORIZON_START_Y, 1);
   } else if (angledeg > 0){   
@@ -97,50 +101,43 @@ void displayHorizon(){
 }
 
 // ROV Battery Update
-void displayROVBatteryData() {
-  tv.print(TOP_X, TOP_Y, "ROV");
+void displayBatteryData() {
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[0]))); //Retrieving variables and copying to buffer
+  tv.print(TOP_X, TOP_Y, buffer);
   drawBattery(22, TOP_Y, BATT_LENGTH, BATT_HEIGHT);
   fillBattery(22, TOP_Y, batt_volts, BATT_HEIGHT); 
-
+  
   // if ROV battery low, print message
-//  if (batt_volts < 3) {
-//    tv.print(44, TOP_Y, "ROV BATTERY LOW");
-//  }
-}
-
-// Pod Battery Update
-void displayPodBatteryData() {
-  tv.print(TOP_X, TOP_Y + 8, "POD");
+  if (batt_volts < 3) {   
+    strcpy_P(buffer, (char*)pgm_read_word(&(string_table[4])));
+    tv.print(44, TOP_Y + 8, buffer);
+  }
+  
+ // Pod Battery Update
+ strcpy_P(buffer, (char*)pgm_read_word(&(string_table[1])));
+  tv.print(TOP_X, TOP_Y + 8, buffer);
   drawBattery(22, TOP_Y + 8, BATT_LENGTH, BATT_HEIGHT);
   fillBattery(22, TOP_Y + 8, pod_volts, BATT_HEIGHT); 
-// 
-//  // if pod battery low, print message
-////  if (pod_volts < 3) { 
-////    tv.print(44, TOP_Y+8, "POD BATTERY LOW");
-////  }
+  
+  if (pod_volts < 3) { 
+    strcpy_P(buffer, (char*)pgm_read_word(&(string_table[5])));
+    tv.print(44, TOP_Y + 8, buffer);
+  }
+  
+
 }
 
 // If temp to high, print message
-void displayROVTempHigh() {
-  tv.print(TOP_X, TOP_Y + 16, "TEMP:");
-////  char * msg = "        ";
-////  sprintf(msg, "%d", temp_val);
-////  printMsg(20, TOP_Y + 16, msg); 
-//  if (temp_val > 50) {
-//   tv.print(44, TOP_Y + 16, "ROV TEMP HIGH");
-//  }
+void displayROVTemp() {
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[2])));
+  tv.print(TOP_X, TOP_Y + 16, buffer);
+  tv.print(24, TOP_Y + 16, temp_val); 
 }
 
 void displayROVDepth(){
- // tv.print(TOP_X, TOP_Y + 24, "DEPTH:");
-//  char * msg = "        ";
-//  sprintf(msg, "%d", depth);
-//  printMsg(24, TOP_Y + 24, msg);       
-}
-
-void drawGraph() {
-  tv.draw_line(HORIZON_START_X, HORIZON_START_Y, HORIZON_LENGTH, HORIZON_START_Y, 1);
-  tv.draw_circle(60, HORIZON_START_Y, 15, WHITE, -1);
+  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[3])));
+ tv.print(TOP_X, TOP_Y + 24, buffer);
+ tv.print(28, TOP_Y + 24, depth_val);       
 }
 
 void drawBattery(int x0, int y0, int x1, int y1) {
