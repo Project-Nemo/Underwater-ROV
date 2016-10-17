@@ -123,7 +123,7 @@ int low_bound = -10;
 int high_bound = 10;
 
 // 0 when not communicating with master, 90 when completely connect
-int neutral = 90;    // stable position of PS2 throttle
+int neutral = 0;    // stable position of PS2 throttle
 
 float MS5803Press;  //Pressure from the MS5803 Sensor.
 float MS5803Temp;  //Temperature from the MS5803 Sensor.
@@ -362,65 +362,7 @@ void loop() {
 
   txdata.ROVDepth = (MS5803Press - 1013) / 98.1; // ROV depth reading (m)
   podDataOut.ROVPressure = MS5803Press;          // send pressure value to pod
-
-  if (SETin.receiveData()) {
-    txdata.sensorData = podDataIn.SensorData;   // for testing TODO: remove
-    txdata.PodPower = podDataIn.PodPower;
-    txdata.PodState = podDataIn.PodState;
-  }
-
-  // adjust PID values
-  if (Serial.available()) {
-    char ch = Serial.read();
-    if (ch == 'x') {
-      changeParams();
-    }
-  }
 }
-
-void changeParams() {
-  Serial.println("Change Paramaters for PID");
-  Serial.print("Current P: ");
-  Serial.println(cP);
-  Serial.print("Enter new value or enter the current one: ");
-  while (!Serial.available()) {
-  }
-  cP = Serial.parseFloat();
-  Serial.println("");
-  
-  Serial.print("Current I: ");
-  Serial.println(cI);
-  Serial.print("Enter new value or enter the current one: ");
-  while (!Serial.available()) {
-  }
-  cI = Serial.parseFloat();
-  Serial.println("");
-  
-  Serial.print("Current D: ");
-  Serial.println(cD);
-  Serial.print("Enter new value or enter the current one: ");
-  while (!Serial.available()) {
-  }
-  cD = Serial.parseFloat();
-  Serial.println("");
-
-  Serial.print("Current PID Scale: ");
-  Serial.println(PIDScale);
-  Serial.print("Enter new value or enter the current one: ");
-  while (!Serial.available()) {
-  }
-  PIDScale = Serial.parseFloat();
-  Serial.println("");
-
-  Serial.print("Current PID Shift: ");
-  Serial.println(PIDShift);
-  Serial.print("Enter new value or enter the current one: ");
-  while (!Serial.available()) {
-  }
-  PIDShift = Serial.parseFloat();
-  Serial.println("");
-}
-
 
 void CamRecTrigger() {
   digitalWrite(CamRecTrig, LOW); //Trip the recorder toggle.
@@ -474,11 +416,6 @@ void stationKeepRoll() {
   // Send values to thruster
   // else stay still
   if (txdata.AccRoll < low_bound || txdata.AccRoll > high_bound) {
-//    Serial.println("");
-//    Serial.print("Left: ");
-//    Serial.println(leftVal);
-//    Serial.print("Right: ");
-//    Serial.println(rightVal);
     ESCVL.write(leftVal);
     ESCVR.write(rightVal);
   } else {
@@ -507,30 +444,11 @@ void read_IMU() {
   // if the pitch is a negative value, the roll is on the left side
   // roll is now any value between 0 to 90 to 0.
   // negative rolling to the left, positive to the right
-  if (accPitch < 0) {
+  if (accPitch > 0) {
     // will give a value between -90 and 0, -90 being the horizontal on the left and 0 being the neutral
-    txdata.AccRoll = accRoll - 85;
+    txdata.AccRoll = accRoll - 90;
   } else {
     // will give a value between 0 and 90, 0 being the neutral and 90 being the horizontal on the right
-    txdata.AccRoll = -accRoll + 85;
+    txdata.AccRoll = -accRoll + 90;
   }
-
-//  Serial.println("");
-//  Serial.print("Accel Pitch: ");
-//  Serial.println(accPitch);
-//  Serial.print("Accel Roll: ");
-//  Serial.println(txdata.AccRoll);
-//  Serial.print("Acc: ");
-//  Serial.print(acc.x_axis);
-//  Serial.print(", ");
-//  Serial.print(acc.y_axis);
-//  Serial.print(", ");
-//  Serial.println(acc.z_axis);
-//  Serial.print("Gyro: ");
-//  Serial.print(gyr.x_axis);
-//  Serial.print(", ");
-//  Serial.print(gyr.y_axis);
-//  Serial.print(", ");
-//  Serial.println(gyr.z_axis);
-//  Serial.println("");
 }
