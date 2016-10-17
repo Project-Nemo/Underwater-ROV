@@ -41,6 +41,8 @@ DallasTemperature tempSensor(&oneWire_in);
 //SoftEasyTransfer ETin, ETout;
 EasyTransfer ETin, ETout;
 
+//Turbidity Calibration
+float turbidity_offset= 0.00;
 
 struct RESEARCH_POD_RECEIVE_DATA {
   int ROVPressure;  // ROV depth reading
@@ -52,6 +54,8 @@ struct RESEARCH_POD_SEND_DATA {
   int PodState;
 } podDataOut;
 
+float current;
+float voltage;
 //##########################################################
 
 void setup() {                                        //set up the hardware
@@ -91,8 +95,8 @@ void setup() {                                        //set up the hardware
     File SD_file = SD.open(fileName, FILE_WRITE);
         // if the file is available, write to it:
         if (SD_file) {
-          SD_file.println("Time,Temp,Light,Turbidity,UV,EC,TSD,SAL,GRAV");
-          //Serial.println("Time,Temp,Light,Turbidity,UV,EC,TSD,SAL,GRAV");
+          SD_file.println("Time,Temp,Light,Turbidity,UV,Current,Voltage,EC,TSD,SAL,GRAV");
+          //Serial.println("Time,Temp,Light,Turbidity,UV,Current,Voltage,EC,TSD,SAL,GRAV");
           SD_file.close();;
         } //else
           //Serial.println("Error writing to SD");
@@ -108,7 +112,16 @@ void setup() {                                        //set up the hardware
   pinMode(UVOUT, INPUT);
   pinMode(REF_3V3, INPUT);
   
-
+  /*TSD10 Calibration*/
+  delay(10);
+  float turbidity;
+  float ntu;
+  turbidity = (float)averageAnalogRead(TURBIDITY_OUT); 
+  //Serial.println(turbidity);
+  turbidity *= 0.00488; // 5/1024 = 0.00488 --> converts to voltage  
+  //Serial.println(turbidity);
+  turbidity_offset = turbidity - 4.3856;
+  //Serial.println(turbidity_offset);
   
 }
 
@@ -116,7 +129,7 @@ void loop() {
   String datastring = "";
 
   /*ROV Communications*/
-  get_power();
+  //get_power();
   ETout.sendData();
   
   /* Pressure Data
@@ -167,6 +180,10 @@ void loop() {
       datastring += ',';
       datastring += get_UV();                         //Add UV to string
       datastring += ',';
+      datastring += get_current();
+      datastring += ',';
+      datastring += get_voltage();
+      datastring += ',';
       datastring += sensorstring;                     //Add AS conductivity to string
       //Serial.println(datastring);
       if(sdCardAvailable){
@@ -174,7 +191,11 @@ void loop() {
         // if the file is available, write to it:
         if (SD_file) {
           podDataOut.SensorData = datastring;
-          SD_file.println(datastring);
+          SD_file.print(datastring);
+          //SD_file.print("voltage , ");
+          //SD_file.print(voltage);
+          //SD_file.print(",");
+          //SD_file.println(current);
           SD_file.close();
           //Serial.println("write to SD successful");
         } //else
@@ -196,8 +217,9 @@ float get_temp(){
 float get_turbidity(){
   float turbidity;
   float ntu;
-  turbidity = averageAnalogRead(TURBIDITY_OUT)-65;
+  turbidity = (float)averageAnalogRead(TURBIDITY_OUT);
   turbidity *= 0.00488; // 5/1024 = 0.00488 --> converts to voltage
+  turbidity -= turbidity_offset;
   /*Linear Approximation of Turbidity*/
   if (turbidity > 2.8)
     ntu = (turbidity-4.3856)/-0.0011;
@@ -205,7 +227,7 @@ float get_turbidity(){
     ntu = (turbidity - 3.8183)/-0.0007;
   else
     ntu = (turbidity - 3.1929)/-0.0005;
-  return ntu;
+  return max(0.00,ntu);
 }
 
 //returns UV value
@@ -218,7 +240,7 @@ float get_UV(){
   
   float uvIntensity = mapfloat(outputVoltage, 0.99, 2.8, 0.0, 15.0); //Convert the voltage to a UV intensity level
 
-  return uvIntensity;
+  return max(0.00,uvIntensity);
 }
 
 //Takes an average of readings on a given pin
@@ -241,14 +263,15 @@ float mapfloat(float x, float in_min, float in_max, float out_min, float out_max
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
-int get_power(){
-  float limit = float(1023); //Take from reference pin?
+float get_current(){
   float currentRead = float(analogRead(A6));
-  float voltageRead = float(analogRead(A6));
-  float current = ((currentRead/limit)*5)/33.0;
-  float voltage = (voltageRead/limit)*10;
+  current = (currentRead/1024.f)*5.f/32.9f;
   podDataOut.PodPower = voltage*current;       // watts 
   podDataOut.PodState = 1;
-  
+  return (current);
 }
-
+float get_voltage(){
+  float voltageRead = float(analogRead(A3));
+  voltage = (voltageRead/1024.f)*5.f/0.3076f;
+  return (voltage);
+}
