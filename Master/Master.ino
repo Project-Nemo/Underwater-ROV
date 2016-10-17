@@ -69,7 +69,6 @@ const int yelLEDpin = 2;  //yellow LED is on Digital pin 2
 const int VwarnLEDpin = 5;  //Voltage warning LED is on Pin D5
 const int TwarnLEDpin = 6;  //ROV temp warning LED is on Pin D6
 const int LowBatVolts10 = 96;  //This is for holding the value of the
-const int LowPodVolts10 = 96;  
 //Low Battery Voltage warning Voltage threshold x10.
 
 int ForwardVal = 0;  //Value read off the PS2 Right Stick up/down.
@@ -87,29 +86,8 @@ struct RECEIVE_DATA_STRUCTURE {
   int ROVTemp; //ROV interior temperature back from the ROV
   int ROVDepth; //ROV depth reading (m)
   int ROVHDG;  //ROV direction (Degrees)
-  // accelerometer x, y, z values
-  int AccX;
-  int AccY;
-  int AccZ;
-  // gyroscope x, y, z values
-  int GyroX;
-  int GyroY;
-  int GyroZ;
-  int AccRoll;
-  int AccPitch;
-  int PodPower;
-  int PodState;
-
-  // for tuning PID
-  int cP;
-  int cD;
-  int cI;
-  int pidScale;
-  int pidShift;
-  int low_bound;
-  int high_bound;
-  // for testing pod
-  String sensorData;
+  int AccRoll;  // angle of ROV
+  int PodVolts;  // pod battery levels
 };
 
 struct SEND_DATA_STRUCTURE {
@@ -121,16 +99,6 @@ struct SEND_DATA_STRUCTURE {
   volatile boolean CamPhotoShot; // Camera photo trigger signal
   volatile boolean CamRec;  //Camera record function toggle
   volatile boolean LEDHdlts; //LED headlights on/off toggle
-
-  // for tuning PID
-  int cP;
-  int cD;
-  int cI;
-  int pidScale;
-  int pidShift;
-  int low_bound;
-  int high_bound;
-  volatile boolean changed;
 };
 
 //give a name to the group of data
@@ -160,6 +128,12 @@ void setup()
   Serial.begin(9600); //Begin Serial to talk to the Slave Arduino
   ETin.begin(details(rxdata), &Serial); //Get the Easy Transfer Library happening through the Serial
   ETout.begin(details(txdata), &Serial);
+
+  // do not print ready message until done
+  while(!ETin.receiveData()){
+    // do nothing
+  }
+  
   lcd.clear();  //make sure screen is clear again.
   lcd.setCursor(0, 0); //Move cursor to top left corner
   lcd.print("Ready");
@@ -170,7 +144,6 @@ void setup()
 
 void loop()
 {
-  txdata.changed = false; // TODO: PID TUNING HELPER
   ps2x.read_gamepad(); //This needs to be called at least once a second
   // to get data from the controller.
   if (ps2x.Button(PSB_PAD_UP)) //Pressed and held
@@ -328,8 +301,8 @@ void loop()
 }
 
 void sendDataToOnScreenDisplay() {
-  int angle = rxdata.AccRoll + 90;   // can't send negative values
-  int pod_volts = scaleVolts(rxdata.PodPower);
+  int angle = rxdata.AccRoll + 100;   // can't send negative values
+  int pod_volts = rxdata.PodVolts;
   int batt_volts = scaleVolts(rxdata.BattVolt);
   int temp = (rxdata.ROVTemp * 0.004882814 - 0.5) * 100;
   int depth = rxdata.ROVDepth;
@@ -343,6 +316,6 @@ void sendDataToOnScreenDisplay() {
 }
 
 int scaleVolts(int volt){
-  // TODO: SCALE
+  // TODO: 
 }
 

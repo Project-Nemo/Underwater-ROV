@@ -335,6 +335,14 @@ void loop() {
   if (SETin.receiveData()) {
     txdata.PodVolts = podDataIn.PodVolts;
   }
+
+   // adjust PID values
+  if (Serial.available()) {
+    char ch = Serial.read();
+    if (ch == 'x') {
+      changeParams();
+    }
+  } 
 }
 
 void CamRecTrigger() {
@@ -419,4 +427,48 @@ void read_IMU() {
     // will give a value between 0 and 85, 0 being the neutral and 85 being the horizontal on the right
     txdata.AccRoll = -accRoll + 85;
   }
+}
+
+// Adjust PID Values
+void changeParams() {
+  Serial.println("Change Paramaters for PID");
+  Serial.print("Current P: ");
+  Serial.println(cP);
+  Serial.print("Enter new value or enter the current one: ");
+  while (!Serial.available()) {
+  }
+  cP = Serial.parseFloat();
+  Serial.println("");
+  
+  Serial.print("Current I: ");
+  Serial.println(cI);
+  Serial.print("Enter new value or enter the current one: ");
+  while (!Serial.available()) {
+  }
+  cI = Serial.parseFloat();
+  Serial.println("");
+  
+  Serial.print("Current D: ");
+  Serial.println(cD);
+  Serial.print("Enter new value or enter the current one: ");
+  while (!Serial.available()) {
+  }
+  cD = Serial.parseFloat();
+  Serial.println("");
+
+  Serial.print("Current PID Scale: ");
+  Serial.println(PIDScale);
+  Serial.print("Enter new value or enter the current one: ");
+  while (!Serial.available()) {
+  }
+  PIDScale = Serial.parseFloat();
+  Serial.println("");
+
+  Serial.print("Current PID Shift: ");
+  Serial.println(PIDShift);
+  Serial.print("Enter new value or enter the current one: ");
+  while (!Serial.available()) {
+  }
+  PIDShift = Serial.parseFloat();
+  Serial.println("");
 }

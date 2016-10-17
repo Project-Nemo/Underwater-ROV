@@ -17,7 +17,7 @@
 #define TURBIDITY_OUT A7 
 #define chipSelect 10 //SPI Chip select pin
 
-// AS Conductivity 
+//#################AS Conductivity##############################
                        
 #define rx 2                                          //define what pin rx is going to be for conductivity
 #define tx 3                                          //define what pin tx is going to be  for conductivity
@@ -27,7 +27,7 @@ String sensorstring = "";                             //a string to hold the dat
 boolean input_string_complete = false;                //have we received all the data from the PC
 boolean sensor_string_complete = false;               //have we received all the data from the Atlas Scientific product
 
-// AS Conductivity 
+//#################AS Conductivity################################
 
 BH1750 lightMeter; //Create Light meter object
 
@@ -36,21 +36,25 @@ String fileName;
 OneWire oneWire_in(ONE_WIRE_BUS_1);
 DallasTemperature tempSensor(&oneWire_in);
 
-// Communication
+//##################Communcation############################
 //SoftwareSerial podSerial(7,8);
 //SoftEasyTransfer ETin, ETout;
 EasyTransfer ETin, ETout;
 
+//Turbidity Calibration
+float turbidity_offset= 0.00;
 
 struct RESEARCH_POD_RECEIVE_DATA {
   int ROVPressure;  // ROV depth reading
 } podDataIn;
 
 struct RESEARCH_POD_SEND_DATA {
-  String SensorData; 
-  int PodPower;
-  int PodState;
+  int PodVolts;
 } podDataOut;
+
+float current;
+float voltage;
+//##########################################################
 
 void setup() {                                        //set up the hardware
   /*Atlas Scientific Conductivity*/
@@ -60,18 +64,13 @@ void setup() {                                        //set up the hardware
   sensorstring.reserve(30);                           //set aside some bytes for receiving data from Atlas Scientific product
 
   /*ROV Communication*/
-  //podSerial.begin(2400);
-  //ETin.begin(details(podDataIn), &podSerial);  
-  //ETout.begin(details(podDataOut), &podSerial);
   ETin.begin(details(podDataIn), &Serial);  
   ETout.begin(details(podDataOut), &Serial);
 
   /*SD Card Initializing Code*/
   if (!SD.begin(chipSelect)) {
-    //Serial.println("SD Card failed, or not present");
     sdCardAvailable = false;
   } else {
-    //Serial.println("SD card initialized.");
     sdCardAvailable = true;
     int dataNumber = 0;
     fileName = "data" + String(dataNumber) + ".csv";
@@ -84,16 +83,13 @@ void setup() {                                        //set up the hardware
         break;
       }
     }
-    //Serial.print("file name to save data is :");
-    //Serial.println(fileName);
+    
     File SD_file = SD.open(fileName, FILE_WRITE);
         // if the file is available, write to it:
         if (SD_file) {
-          SD_file.println("Time,Temp,Light,Turbidity,UV,EC,TSD,SAL,GRAV");
-          //Serial.println("Time,Temp,Light,Turbidity,UV,EC,TSD,SAL,GRAV");
+          SD_file.println("Time,Temp,Light,Turbidity,UV,Current,Voltage,EC,TSD,SAL,GRAV");
           SD_file.close();;
-        } //else
-          //Serial.println("Error writing to SD");
+        }
   }
   
   /*DS18b20 Dallas one wire*/
@@ -104,14 +100,21 @@ void setup() {                                        //set up the hardware
 
   /*UV ML8511*/
   pinMode(UVOUT, INPUT);
-  pinMode(REF_3V3, INPUT);  
+  pinMode(REF_3V3, INPUT);
+  
+  /*TSD10 Calibration*/
+  delay(10);
+  float turbidity;
+  float ntu;
+  turbidity = (float)averageAnalogRead(TURBIDITY_OUT); 
+  turbidity *= 0.00488; // 5/1024 = 0.00488 --> converts to voltage  
+  turbidity_offset = turbidity - 4.3856;  
 }
 
 void loop() {
   String datastring = "";
 
   /*ROV Communications*/
-  get_power();
   ETout.sendData();
   
   /* Pressure Data
@@ -148,10 +151,9 @@ void loop() {
 
   if (sensor_string_complete == true) {               //if a string from the Atlas Scientific product has been received in its entirety
     if (isdigit(sensorstring[0]) == false) {          //if the first character in the string is a digit
-      //Serial.println(sensorstring);                   //send that string to the PC's serial monitor
+      // do nothing
     }
-    else                                              //if the first character in the string is NOT a digit
-    {
+    else {                                            //if the first character in the string is NOT a digit
       datastring += millis()/1000.00;                       //Add timestamp to string
       datastring += ',';
       datastring += get_temp();                       //Add temp to string
@@ -162,23 +164,29 @@ void loop() {
       datastring += ',';
       datastring += get_UV();                         //Add UV to string
       datastring += ',';
+      datastring += get_current();
+      datastring += ',';
+      datastring += get_voltage();
+      datastring += ',';
       datastring += sensorstring;                     //Add AS conductivity to string
-      //Serial.println(datastring);
       if(sdCardAvailable){
         File SD_file = SD.open(fileName, FILE_WRITE);
         // if the file is available, write to it:
         if (SD_file) {
-          podDataOut.SensorData = datastring;
-          SD_file.println(datastring);
+          SD_file.print(datastring);
           SD_file.close();
-          //Serial.println("write to SD successful");
-        } //else
-          //Serial.println("Error writing to SD");
+        }
       }
     }
     sensorstring = "";                                //clear the string
     sensor_string_complete = false;                   //reset the flag used to tell if we have received a completed string from the Atlas Scientific product
   }
+  podDataOut.PodVolts = get_scaled_pod_volts();
+}
+
+int get_scaled_pod_volts(){
+  float volts = get_voltage();
+  // TODO: scale here!
 }
 
 //returns temperature value
@@ -191,8 +199,10 @@ float get_temp(){
 float get_turbidity(){
   float turbidity;
   float ntu;
-  turbidity = averageAnalogRead(TURBIDITY_OUT)-65;
+  turbidity = (float)averageAnalogRead(TURBIDITY_OUT);
   turbidity *= 0.00488; // 5/1024 = 0.00488 --> converts to voltage
+  turbidity -= turbidity_offset;
+  
   /*Linear Approximation of Turbidity*/
   if (turbidity > 2.8)
     ntu = (turbidity-4.3856)/-0.0011;
@@ -200,7 +210,7 @@ float get_turbidity(){
     ntu = (turbidity - 3.8183)/-0.0007;
   else
     ntu = (turbidity - 3.1929)/-0.0005;
-  return ntu;
+  return max(0.00,ntu);
 }
 
 //returns UV value
@@ -213,7 +223,7 @@ float get_UV(){
   
   float uvIntensity = mapfloat(outputVoltage, 0.99, 2.8, 0.0, 15.0); //Convert the voltage to a UV intensity level
 
-  return uvIntensity;
+  return max(0.00,uvIntensity);
 }
 
 //Takes an average of readings on a given pin
@@ -236,14 +246,14 @@ float mapfloat(float x, float in_min, float in_max, float out_min, float out_max
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
-int get_power(){
-  float limit = float(1023); //Take from reference pin?
+float get_current(){
   float currentRead = float(analogRead(A6));
-  float voltageRead = float(analogRead(A6));
-  float current = ((currentRead/limit)*5)/33.0;
-  float voltage = (voltageRead/limit)*10;
-  podDataOut.PodPower = voltage*current;       // watts 
-  podDataOut.PodState = 1;
-  
+  current = (currentRead/1024.f)*5.f/32.9f;
+  return (current);
 }
 
+float get_voltage(){
+  float voltageRead = float(analogRead(A3));
+  voltage = (voltageRead/1024.f)*5.f/0.3076f;
+  return (voltage);
+}

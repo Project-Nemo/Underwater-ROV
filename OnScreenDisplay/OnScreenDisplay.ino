@@ -24,7 +24,7 @@ const char temp[] PROGMEM  = "TEMP:";
 const char rovbattlow[] PROGMEM  ="ROV BATTERY LOW";
 const char podbattlow[] PROGMEM  ="POD BATTERY LOW";
 const char* const string_table[] PROGMEM = {rov, pod, temp,depth, rovbattlow, podbattlow}; //To move variables to SRAM 
-char buffer[20];
+char buffer[16];
 
 TVout tv;   // On Screen Display screen variable
 
@@ -87,7 +87,7 @@ ISR(INT0_vect) {
 void displayHorizon(){
   tv.draw_line(HORIZON_START_X, HORIZON_START_Y, HORIZON_LENGTH, HORIZON_START_Y, 1);
   tv.draw_circle(60, HORIZON_START_Y, 15, WHITE, -1);
-  angledeg = angledeg - 90; // Value sent will be 90 degress greater than actual angle
+  angledeg = angledeg - 100; // Value sent will be 90 degress greater than actual angle
   float angle = (angledeg/180.0) *PI;
   int x = sin(abs(angle)) * LINE_LENGTH;
   int y = cos(abs(angle)) * LINE_LENGTH;
@@ -108,7 +108,7 @@ void displayBatteryData() {
   fillBattery(22, TOP_Y, batt_volts, BATT_HEIGHT); 
   
   // if ROV battery low, print message
-  if (batt_volts < 3) {   
+  if (batt_volts <= 2) {     // just a bit above 96 value reading
     strcpy_P(buffer, (char*)pgm_read_word(&(string_table[4])));
     tv.print(44, TOP_Y + 8, buffer);
   }
@@ -119,15 +119,12 @@ void displayBatteryData() {
   drawBattery(22, TOP_Y + 8, BATT_LENGTH, BATT_HEIGHT);
   fillBattery(22, TOP_Y + 8, pod_volts, BATT_HEIGHT); 
   
-  if (pod_volts < 3) { 
+  if (pod_volts <= 3) { 
     strcpy_P(buffer, (char*)pgm_read_word(&(string_table[5])));
     tv.print(44, TOP_Y + 8, buffer);
   }
-  
-
 }
 
-// If temp to high, print message
 void displayROVTemp() {
   strcpy_P(buffer, (char*)pgm_read_word(&(string_table[2])));
   tv.print(TOP_X, TOP_Y + 16, buffer);
@@ -135,7 +132,7 @@ void displayROVTemp() {
 }
 
 void displayROVDepth(){
-  strcpy_P(buffer, (char*)pgm_read_word(&(string_table[3])));
+ strcpy_P(buffer, (char*)pgm_read_word(&(string_table[3])));
  tv.print(TOP_X, TOP_Y + 24, buffer);
  tv.print(28, TOP_Y + 24, depth_val);       
 }
