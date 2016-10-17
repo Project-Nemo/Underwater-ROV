@@ -1,41 +1,166 @@
-#include <TVout.h>
-#include <video_gen.h>
+/*
+  ROVPS2Control_Masterv8.ino
+  Hamish Trolove – 30 March 2016
+  www.techmonkeybusiness.com
+  This sketch takes control commands from a PS2 handset and transmits the
+  commands using Bill Porter's EasyTransfer Library over a 9600 baud serial
+  link (100m tether).
+  This sketch is designed for an Arduino Nano with only one Serial Port.
+  Pin assignments are:
+  3.3V output to PS2 red Pin
+  Pin D10 to PS2 yellow pin
+  Pin D11 to PS2 orange pin
+  Pin D12 to PS2 brown pin
+  Pin D13 to PS2 blue pin
+  Pin D2 to LED Camera Photo Trigger Indicator
+  Pin D3 to LED Camera Record Indicator
+  Pin D4 to LED Main Lights Indicator
+  Pin D5 to LED ROV Battery Low Voltage Warning
+  Pin D6 to LED ROV Interior high temperature warning
+  Communications
+  Serial Connection: Topside D1 (TX) to ROV D0 (RX)
+  Serial Connection: Topside D0 (RX) to ROV D1 (TX)
+  Connect the GND on both
+  A 16x2 LCD screen is connected as follows
+  VSS to GND
+  VDD to 5V output of MC78T05CT regulator
+  VO to sweep arm of 10kohm variable resistor
+  RS to Arduino Nano pin A0
+  RW to GND
+  E to Arduino Nano pin A1
+  D4 to Arduino Nano pin A2
+  D5 to Arduino Nano pin A3
+  D6 to Arduino Nano pin A4
+  D7 to Arduino Nano pin A5
+  A to 5V output of MC78T05CT regulator
+  K to GND via a 330ohm resistor
+  5V is supplied from a regulator to the 1Kohm pull up resistors
+  for PS2 as well as the LCD screen and it's backlight
+  The coding pulls on the PSX library developed by Bill Porter.
+  See www.billporter.info for the latest from Bill Porter and to
+  download the library.
+  The controls for the ROV are;
+  Left Stick - X-axis = Roll, Y-axis = Up/down
+  Right Stick - X-axis = Yaw, Y-axis = forward/back
+  Direction button pad left = LED Main lights On/Off toggle
+  Direction button pad up = turn camera upwards
+  Direction button pad down = turn camera downwards
+  Direction button pad right = Change reading on display
+  Triangle = Start/Stop video recording
+  Circle = Take photo
+*/
 
+
+#include <PS2X_lib.h> // Bill Porter's PS2 Library
+#include <EasyTransfer.h> // Bill Porter's Easy Transfer Library
+#include <LiquidCrystal.h>
 #include <TVout.h>
 #include <fontALL.h>
+#include <video_gen.h>
 
+#define W 136    // width of screen for osd
+#define H 96     // height of screen for osd
 
-#define W 136
-#define H 96
+TVout tv;   // On Screen Display screen variable
+PS2X ps2x;  //The PS2 Controller Class
+EasyTransfer ETin, ETout;  //Create the two Easy transfer Objects for
+// Two way communication
 
-TVout tv;
+LiquidCrystal lcd(A0, A1, A2, A3, A4, A5); //Pins for the LCD display
 
-unsigned char originx = 5;
-unsigned char originy = 80;
+const int grnLEDpin = 4;  //green LED is on Digital pin 4
+const int redLEDpin = 3;  //red LED is on Digital pin 3.
+const int yelLEDpin = 2;  //yellow LED is on Digital pin 2
+const int VwarnLEDpin = 5;  //Voltage warning LED is on Pin D5
+const int TwarnLEDpin = 6;  //ROV temp warning LED is on Pin D6
+const int LowBatVolts10 = 96;  //This is for holding the value of the
+const int LowPodVolts10 = 96;  
+//Low Battery Voltage warning Voltage threshold x10.
+
+int ForwardVal = 0;  //Value read off the PS2 Right Stick up/down.
+int YawLeftVal = 0;  //Value read off the PS2 Right Stick left/right
+int UpVal = 0; //Value read off the PS2 Left Stick up/down
+int RollLeftVal = 0; // Value read off the PS2 Left Stick left/right
+float ROVTMP = 0;  //Variable to hold the converted ROV interior temperature.
+int DispOpt = 0; //Variable to signal which value to show on the display
+
+long PhotoSignalRunTime = 0; //A variable to carry the time since photo triggered.
+volatile boolean PhotoActive = false;  // A flag to show that the camera signal has been sent.
+
+// On scren display params for displaying values
+unsigned char originx = 5;     // start x position for on screen display
+unsigned char originy = 80;    // start y position for on screen display
 unsigned char centrex = 60;
-char s[32];
-unsigned int n = 0;
-int index = 0;
-double x;
-double y;
-int linelen = 25;
-int messageLen = 32;
-char message[] = "";
-char saveChar;
-float angledeg = -90.0 ;
-float angle ;
-int battery = 100;
-void setup()  {
+int linelen = 16;
 
+struct RECEIVE_DATA_STRUCTURE {
+  int BattVolt;  //Battery Voltage message from the ROV.
+  int ROVTemp; //ROV interior temperature back from the ROV
+  int ROVDepth; //ROV depth reading (m)
+  int ROVHDG;  //ROV direction (Degrees)
+  // accelerometer x, y, z values
+  int AccX;
+  int AccY;
+  int AccZ;
+  // gyroscope x, y, z values
+  int GyroX;
+  int GyroY;
+  int GyroZ;
+  int AccRoll;
+  int AccPitch;
+  int PodPower;
+  int PodState;
+
+  // for tuning PID
+  int cP;
+  int cD;
+  int cI;
+  int pidScale;
+  int pidShift;
+  int low_bound;
+  int high_bound;
+  // for testing pod
+  String sensorData;
+};
+
+struct SEND_DATA_STRUCTURE {
+  int upLraw;  //Variables to carry the actual raw data for the ESCs
+  int upRraw;
+  int HLraw;
+  int HRraw;
+  int CamPitch; //Angle of the camera servo.
+  volatile boolean CamPhotoShot; // Camera photo trigger signal
+  volatile boolean CamRec;  //Camera record function toggle
+  volatile boolean LEDHdlts; //LED headlights on/off toggle
+
+  // for tuning PID
+  int cP;
+  int cD;
+  int cI;
+  int pidScale;
+  int pidShift;
+  int low_bound;
+  int high_bound;
+  volatile boolean changed;
+};
+
+//give a name to the group of data
+RECEIVE_DATA_STRUCTURE rxdata;
+SEND_DATA_STRUCTURE txdata;
+
+void setup()  {
   tv.begin(PAL, W, H);
   tv.delay(500);
   initOverlay();
-  tv.select_font(font6x8);
-  tv.fill(0);
-  drawGraph();
+  tv.select_font(font4x6);
+  tv.clear_screen();
   randomSeed(analogRead(0));
-
 }
+
+void loop() {
+  updateOnScreenDisplay();
+} 
+
 // Initialize ATMega registers for video overlay capability.
 // Must be called after tv.begin().
 void initOverlay() {
@@ -56,76 +181,78 @@ ISR(INT0_vect) {
   display.scanLine = 0;
 }
 
-
-void loop() {
-  angle = angledeg * 180.0 / PI;
-  tv.fill(0);
+void updateOnScreenDisplay() {
+  tv.clear_screen();
   drawGraph();
-  if (angle == 0.0)
-  {
-    drawLine(centrex, originy, centrex, originy - linelen);
-  }
-  else if (angle > 0.0)
-  {
-    x = cos(angle) * (double)linelen;
-    y = sin(angle) * (double)linelen;
-    drawLine(centrex, originy, centrex - (int)x, originy - (int)y);
-  }
-
-  else if (angle < 0.0)
-  {
-    x = cos(abs(angle)) * (double)linelen;
-    y = sin(abs(angle)) * (double)linelen;
-    drawLine(centrex, originy, centrex + (int)x, originy - (int)y);
-  }
-  angledeg =angledeg +1.0;
-  if (angledeg > 90.0) {
-    angledeg = -90.0;
-  }
-
-drawBattery();
-battery = battery-10;
-if (battery==100){
-tv.draw_rect(originx,15,10,5,1,1);
-}
-else if (battery==80){
-tv.draw_rect(originx,15,8,5,1,1);
-}
-else if (battery==60){
-tv.draw_rect(originx,15,6,5,1,1);
-}
-else if(battery==40){
-tv.draw_rect(originx,15,4,5,1,1);
-}
-else if (battery==20){
-tv.draw_rect(originx,15,2,5,1,1);
-}
-else if (battery==0){
-tv.draw_rect(originx,15,0,5,1,1);
-}
-if (battery==0.0){
-  battery = 100.0;
-}
-
-  
+  int angle = -20;            // TODO change angle
+  displayHorizon(angle);
+  displayROVBatteryData(10);  // TODO change
+  displayPodBatteryData(10);  // TODO change
+  displayROVTempHigh(1000);   // TODO change
+  displayDepth(50);           // TODO change
   delay(200);
-  return;
 }
 
+ void displayHorizon(int angle){  
+  float x = sin(abs(angle)) * (double)linelen;
+  float y = cos(abs(angle)) * (double)linelen;
+   if (angle== 0.0){
+    tv.draw_line(centrex - linelen, originy, centrex+linelen, originy, 1);
+  } else if (angle > 0.0){   
+    tv.draw_line(centrex + (int)x , originy + (int)y, centrex - (int)x, originy - (int)y, 1);
+  } else if (angle < 0.0){   
+    tv.draw_line(centrex - (int)x, originy + (int)y, centrex + (int)x, originy - (int)y, 1);
+  }
+}
+
+// ROV Battery Update
+void displayROVBatteryData(int volts) {
+  // volts = 10;   // TODO change
+  tv.print(2, 2, "ROV");
+  drawBattery(22, 2, 10, 4);
+  tv.draw_rect(22, 2, volts, 4, 1, 1); 
+
+  // if ROV battery low, print message
+  if (volts < LowBatVolts10) {
+    tv.print(44, 10, "ROV BATTERY LOW");
+  }
+}
+
+// Pod Battery Update
+void displayPodBatteryData(int volts) {
+  // volts = 10; // TODO: Rescale watts (need voltages)
+  tv.print(2, 10, "POD");
+  drawBattery(22, 10, 10, 4);
+  tv.draw_rect(22, 10, volts, 4, 1, 1); 
+  
+  // if pod battery low, print message
+  if (volts < LowPodVolts10) { 
+    tv.print(44, 2, "POD BATTERY LOW");
+  }
+}
+
+// If temp to high, print message
+void displayROVTempHigh(int temp) {
+  float tmp = (temp * 0.004882814 - 0.5) * 100; //converts the 0-1024
+  //data value into temperature.
+  tv.print(2, 18, "TEMP");
+  tv.print(20, 18, tmp); 
+  if (tmp > 50) {
+    tv.print(44, 18, "ROV TEMP HIGH");
+  }
+}
+
+void displayDepth(int depth){
+  tv.print(2, 26, "DEPTH");
+  tv.print(24, 26, depth);       
+  tv.print(32, 26, "m");
+}
 
 void drawGraph() {
   tv.draw_line(originx, originy, 120, originy, 1);
   tv.draw_circle(60, originy, 15, WHITE, -1);
 }
-void drawBattery(){
-  tv.draw_rect(originx,15,10,5,1, -1);
+
+void drawBattery(int x0, int y0, int x1, int y1) {
+  tv.draw_rect(x0, y0, x1, y1, 1, 0);  // x, y, width, height, outline colour, fill
 }
-
-
-
-
-void drawLine(int x0, int y0, int x1, int y1) {
-  tv.draw_line(x0, y0, x1, y1, 1);
-}
-
-
