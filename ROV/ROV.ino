@@ -387,11 +387,19 @@ void stationKeepRoll() {
   // Send values to thruster
   // else stay still
   if (txdata.AccRoll < low_bound || txdata.AccRoll > high_bound) {
+//    Serial.println("");
+//    Serial.print("Left: ");
+//    Serial.println(leftVal);
+//    Serial.print("Right: ");
+//    Serial.println(rightVal);
+//    Serial.println("");
     ESCVL.write(leftVal);
     ESCVR.write(rightVal);
     ESCHL.write(90);  
     ESCHR.write(90);  
   } else {
+//    Serial.print("AccRoll: ");
+//    Serial.println(txdata.AccRoll);
     ESCVL.write(90);
     ESCVR.write(90);
     ESCHL.write(90);  

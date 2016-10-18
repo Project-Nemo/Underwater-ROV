@@ -130,9 +130,9 @@ void setup()
   ETout.begin(details(txdata), &Serial);
 
   // do not print ready message until done
-  while(!ETin.receiveData()){
-    // do nothing
-  }
+//  while(!ETin.receiveData()){
+//    // do nothing
+//  }
   
   lcd.clear();  //make sure screen is clear again.
   lcd.setCursor(0, 0); //Move cursor to top left corner
@@ -209,8 +209,18 @@ void loop()
   txdata.upRraw = map(txdata.upRraw, -193, 198, 0, 179);
   txdata.HLraw = map(txdata.HLraw, -256, 256, 0, 179);
   txdata.HRraw = map(txdata.HRraw, -256, 256, 0, 179);
-
-
+  
+  Serial.println("");
+  Serial.print("VL: ");
+  Serial.println(txdata.upLraw);
+  Serial.print("VR: ");
+  Serial.println(txdata.upRraw);
+  Serial.print("HL: ");
+  Serial.println(txdata.HLraw);
+  Serial.print("HR: ");
+  Serial.println(txdata.HRraw);
+  Serial.println("");
+  
 
   // Send the message to the serial port for the ROV Arduino
   ETout.sendData();

@@ -87,15 +87,15 @@ ISR(INT0_vect) {
 void displayHorizon(){
   tv.draw_line(HORIZON_START_X, HORIZON_START_Y, HORIZON_LENGTH, HORIZON_START_Y, 1);
   tv.draw_circle(60, HORIZON_START_Y, 15, WHITE, -1);
-  angledeg = angledeg - 100; // Value sent will be 90 degress greater than actual angle
+  angledeg = angledeg - 90; // Value sent will be 90 degress greater than actual angle
   float angle = (angledeg/180.0) *PI;
-  int x = sin(abs(angle)) * LINE_LENGTH;
-  int y = cos(abs(angle)) * LINE_LENGTH;
+  int x = cos(abs(angle)) * LINE_LENGTH;
+  int y = sin(abs(angle)) * LINE_LENGTH;
   if (angledeg == 0){
     tv.draw_line(CENTER_X - LINE_LENGTH, HORIZON_START_Y, CENTER_X + LINE_LENGTH, HORIZON_START_Y, 1);
-  } else if (angledeg > 0){   
-    tv.draw_line(CENTER_X + x , HORIZON_START_Y + y, CENTER_X - x, HORIZON_START_Y - y, 1);
   } else if (angledeg < 0){   
+    tv.draw_line(CENTER_X + x , HORIZON_START_Y + y, CENTER_X - x, HORIZON_START_Y - y, 1);
+  } else if (angledeg > 0){   
     tv.draw_line(CENTER_X - x, HORIZON_START_Y + y, CENTER_X + x, HORIZON_START_Y - y, 1);
   }
 }
