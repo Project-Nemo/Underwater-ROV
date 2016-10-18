@@ -474,11 +474,11 @@ void stationKeepRoll() {
   // Send values to thruster
   // else stay still
   if (txdata.AccRoll < low_bound || txdata.AccRoll > high_bound) {
-//    Serial.println("");
-//    Serial.print("Left: ");
-//    Serial.println(leftVal);
-//    Serial.print("Right: ");
-//    Serial.println(rightVal);
+    Serial.println("");
+    Serial.print("Left: ");
+    Serial.println(leftVal);
+    Serial.print("Right: ");
+    Serial.println(rightVal);
     ESCVL.write(leftVal);
     ESCVR.write(rightVal);
   } else {
@@ -515,11 +515,11 @@ void read_IMU() {
     txdata.AccRoll = -accRoll + 85;
   }
 
-//  Serial.println("");
+  Serial.println("");
 //  Serial.print("Accel Pitch: ");
 //  Serial.println(accPitch);
-//  Serial.print("Accel Roll: ");
-//  Serial.println(txdata.AccRoll);
+  Serial.print("Accel Roll: ");
+  Serial.println(txdata.AccRoll);
 //  Serial.print("Acc: ");
 //  Serial.print(acc.x_axis);
 //  Serial.print(", ");
@@ -532,5 +532,5 @@ void read_IMU() {
 //  Serial.print(gyr.y_axis);
 //  Serial.print(", ");
 //  Serial.println(gyr.z_axis);
-//  Serial.println("");
+  Serial.println("");
 }
