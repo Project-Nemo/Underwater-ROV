@@ -292,9 +292,10 @@ void loop() {
 
   delay(18);  //This delay is added to give the ROV a chance to
   //return data
-  volts = analogRead(Voltpin) / ResistFactor * RefVolts * 10; //Read the voltage
+  // volts = analogRead(Voltpin) / ResistFactor * RefVolts * 10; //Read the voltage
   //from the battery through the voltage divider.  Factor of 10 used
   //to help achieve an integer with 0.1V accuracy.
+  volts = map(analogRead(Voltpin), 575, 633, 1, 10);
   txdata.BattVolt = volts; //Send back the onboard battery voltage.
   txdata.ROVTemp = analogRead(Temppin); //This reads the pin keeps it as a 0-1024 value.
 
@@ -389,13 +390,9 @@ void stationKeepRoll() {
   if (txdata.AccRoll < low_bound || txdata.AccRoll > high_bound) {
     ESCVL.write(leftVal);
     ESCVR.write(rightVal);
-    ESCHL.write(90);  
-    ESCHR.write(90);  
   } else {
     ESCVL.write(90);
     ESCVR.write(90);
-    ESCHL.write(90);  
-    ESCHR.write(90); 
   }
 }
 

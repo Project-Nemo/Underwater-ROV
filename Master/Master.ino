@@ -68,8 +68,7 @@ const int redLEDpin = 3;  //red LED is on Digital pin 3.
 const int yelLEDpin = 2;  //yellow LED is on Digital pin 2
 const int VwarnLEDpin = 5;  //Voltage warning LED is on Pin D5
 const int TwarnLEDpin = 6;  //ROV temp warning LED is on Pin D6
-const int LowBatVolts10 = 96;  //This is for holding the value of the
-//Low Battery Voltage warning Voltage threshold x10.
+const int LowBatVolts10 = 3; // Changed to value between 1 and 10 (3 is low)
 
 int ForwardVal = 0;  //Value read off the PS2 Right Stick up/down.
 int YawLeftVal = 0;  //Value read off the PS2 Right Stick left/right
@@ -128,11 +127,6 @@ void setup()
   Serial.begin(9600); //Begin Serial to talk to the Slave Arduino
   ETin.begin(details(rxdata), &Serial); //Get the Easy Transfer Library happening through the Serial
   ETout.begin(details(txdata), &Serial);
-
-  // do not print ready message until done
-  while(!ETin.receiveData()){
-    // do nothing
-  }
   
   lcd.clear();  //make sure screen is clear again.
   lcd.setCursor(0, 0); //Move cursor to top left corner
@@ -301,9 +295,9 @@ void loop()
 }
 
 void sendDataToOnScreenDisplay() {
-  int angle = rxdata.AccRoll + 100;   // can't send negative values
-  int pod_volts = rxdata.PodVolts;
-  int batt_volts = scaleVolts(rxdata.BattVolt);
+  int angle = rxdata.AccRoll + 90;   // can't send negative values
+  int pod_volts = rxdata.PodVolts;  // scaled from 1 to 10
+  int batt_volts = rxdata.BattVolt;  // scaled from 1 to 10
   int temp = (rxdata.ROVTemp * 0.004882814 - 0.5) * 100;
   int depth = rxdata.ROVDepth;
 
@@ -314,8 +308,3 @@ void sendDataToOnScreenDisplay() {
   osdComms.write(temp);  
   osdComms.write(depth);   
 }
-
-int scaleVolts(int volt){
-  // TODO: 
-}
-
