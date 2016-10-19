@@ -295,10 +295,6 @@ void loop() {
   volts = analogRead(Voltpin) / ResistFactor * RefVolts * 10; //Read the voltage
   //from the battery through the voltage divider.  Factor of 10 used
   //to help achieve an integer with 0.1V accuracy.
-  Serial.println("Volts:");
-  Serial.println(volts);
-  Serial.println();
-  Serial.println(analogRead(Voltpin));
   txdata.BattVolt = volts; //Send back the onboard battery voltage.
   txdata.ROVTemp = analogRead(Temppin); //This reads the pin keeps it as a 0-1024 value.
 

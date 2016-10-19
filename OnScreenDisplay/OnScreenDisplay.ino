@@ -119,7 +119,7 @@ void displayBatteryData() {
   drawBattery(22, TOP_Y + 8, BATT_LENGTH, BATT_HEIGHT);
   fillBattery(22, TOP_Y + 8, pod_volts, BATT_HEIGHT); 
   
-  if (pod_volts <= 3) { 
+  if (pod_volts <= 1) { 
     strcpy_P(buffer, (char*)pgm_read_word(&(string_table[5])));
     tv.print(44, TOP_Y + 8, buffer);
   }

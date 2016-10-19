@@ -8,7 +8,6 @@
 #include <DallasTemperature.h>
 #include <SoftwareSerial.h>    //we have to include the SoftwareSerial library, or else we can't use it
 
-
 #define ONE_WIRE_BUS_1 4
 
 //Hardware pin definitions
@@ -118,20 +117,10 @@ void loop() {
   /*ROV Communications*/
   ETout.sendData();
   
-  /* Pressure Data
-  if(ETin.receiveData()){
-    //dataString += String("Pressure: ");
-    dataString += String(podDataIn.ROVPressure);
-    dataString += ",";
-  }
-  */
-  
   if(Serial.available() >1){    
     String command;
     command = Serial.readString();
     ASSerial.print(command); 
-    //Serial.println("command:");
-    //Serial.print(command);
   }
 
   if (input_string_complete) {                        //if a string from the PC has been received in its entirety

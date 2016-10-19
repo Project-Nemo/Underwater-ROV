@@ -127,7 +127,7 @@ void setup()
   Serial.begin(9600); //Begin Serial to talk to the Slave Arduino
   ETin.begin(details(rxdata), &Serial); //Get the Easy Transfer Library happening through the Serial
   ETout.begin(details(txdata), &Serial);
-  
+
   lcd.clear();  //make sure screen is clear again.
   lcd.setCursor(0, 0); //Move cursor to top left corner
   lcd.print("Ready");
@@ -202,9 +202,7 @@ void loop()
   txdata.upLraw = map(txdata.upLraw, -193, 193, 0, 179);
   txdata.upRraw = map(txdata.upRraw, -193, 198, 0, 179);
   txdata.HLraw = map(txdata.HLraw, -256, 256, 0, 179);
-  txdata.HRraw = map(txdata.HRraw, -256, 256, 0, 179);
-
-
+  txdata.HRraw = map(txdata.HRraw, -256, 256, 0, 179);  
 
   // Send the message to the serial port for the ROV Arduino
   ETout.sendData();
@@ -300,8 +298,7 @@ void sendDataToOnScreenDisplay() {
   int batt_volts = rxdata.BattVolt;  // scaled from 1 to 10
   int temp = (rxdata.ROVTemp * 0.004882814 - 0.5) * 100;
   int depth = rxdata.ROVDepth;
-
-  // TODO: transfer variables
+  
   osdComms.write(angle);   
   osdComms.write(pod_volts);   
   osdComms.write(batt_volts);   

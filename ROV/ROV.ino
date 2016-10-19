@@ -122,7 +122,7 @@ int rightVal; // Right thruster value
 int low_bound = -10; 
 int high_bound = 10;
 
-// 0 when not communicating with master, 90 when completely connect
+// 0 when not communicating with master, 90 when completely connected
 int neutral = 90;    // stable position of PS2 throttle
 
 float MS5803Press;  //Pressure from the MS5803 Sensor.
@@ -290,12 +290,11 @@ void loop() {
     digitalWrite(CamPhotTrig, HIGH); //Just make them both inactive
   }
 
-  delay(18);  //This delay is added to give the ROV a chance to
-  //return data
+  delay(18);  //This delay is added to give the ROV a chance to return data
   // volts = analogRead(Voltpin) / ResistFactor * RefVolts * 10; //Read the voltage
   //from the battery through the voltage divider.  Factor of 10 used
   //to help achieve an integer with 0.1V accuracy.
-  volts = map(analogRead(Voltpin), 575, 633, 1, 10);
+  volts = map(analogRead(Voltpin), 575, 633, 1, 10);  // voltage reader adjusted to scale output between 1 and 10
   txdata.BattVolt = volts; //Send back the onboard battery voltage.
   txdata.ROVTemp = analogRead(Temppin); //This reads the pin keeps it as a 0-1024 value.
 
