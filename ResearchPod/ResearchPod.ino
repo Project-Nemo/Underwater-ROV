@@ -8,6 +8,7 @@
 #include <DallasTemperature.h>
 #include <SoftwareSerial.h>    //we have to include the SoftwareSerial library, or else we can't use it
 
+
 #define ONE_WIRE_BUS_1 4
 
 //Hardware pin definitions
@@ -186,7 +187,9 @@ void loop() {
 
 int get_scaled_pod_volts(){
   float volts = get_voltage();
-  // TODO: scale here!
+  float conversion = (log(volts) - 2.1152)/-0.2341;
+  int value = 10 * (1 - conversion);
+  return min(max(value, 0), 10);
 }
 
 //returns temperature value
