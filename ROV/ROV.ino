@@ -334,6 +334,8 @@ void loop() {
   // send battery levels of the pod to master
   if (SETin.receiveData()) {
     txdata.PodVolts = podDataIn.PodVolts;
+  } else {
+    txdata.PodVolts = 10;
   }
 }
 
@@ -389,9 +391,13 @@ void stationKeepRoll() {
   if (txdata.AccRoll < low_bound || txdata.AccRoll > high_bound) {
     ESCVL.write(leftVal);
     ESCVR.write(rightVal);
+    ESCHL.write(90);  
+    ESCHR.write(90);
   } else {
     ESCVL.write(90);
     ESCVR.write(90);
+    ESCHL.write(90); 
+    ESCHR.write(90);
   }
 }
 

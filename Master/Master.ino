@@ -128,6 +128,10 @@ void setup()
   ETin.begin(details(rxdata), &Serial); //Get the Easy Transfer Library happening through the Serial
   ETout.begin(details(txdata), &Serial);
 
+  while(!ETin.receiveData()){
+    // do nothing
+  }
+
   lcd.clear();  //make sure screen is clear again.
   lcd.setCursor(0, 0); //Move cursor to top left corner
   lcd.print("Ready");
@@ -297,7 +301,7 @@ void sendDataToOnScreenDisplay() {
   int pod_volts = rxdata.PodVolts;  // scaled from 1 to 10
   int batt_volts = rxdata.BattVolt;  // scaled from 1 to 10
   int temp = (rxdata.ROVTemp * 0.004882814 - 0.5) * 100;
-  int depth = rxdata.ROVDepth;
+  int depth = 1; // until depth sensor works rxdata.ROVDepth;
   
   osdComms.write(angle);   
   osdComms.write(pod_volts);   

@@ -110,7 +110,7 @@ void displayBatteryData() {
   // if ROV battery low, print message
   if (batt_volts <= 2) {     
     strcpy_P(buffer, (char*)pgm_read_word(&(string_table[4])));
-    tv.print(44, TOP_Y + 8, buffer);
+    tv.print(44, TOP_Y, buffer);
   }
   
  // Pod Battery Update

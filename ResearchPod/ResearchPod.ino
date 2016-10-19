@@ -176,9 +176,11 @@ void loop() {
 
 int get_scaled_pod_volts(){
   float volts = get_voltage();
-  float conversion = (log(volts) - 2.1152)/-0.2341;
-  int value = 10 * (1 - conversion);
-  return min(max(value, 0), 10);
+  float conversion = -1 * (log(volts) - 2.1152)/0.2341;
+  int value = 10 * (1 - conversion); 
+  int lowerBound = max(value, 0);
+  int actual = min(lowerBound, 10);
+  return actual; 
 }
 
 //returns temperature value
