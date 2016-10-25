@@ -102,9 +102,18 @@ void displayHorizon(){
 
 // ROV Battery Update
 void displayBatteryData() {
+  // bound pod and battery voltages
+  if (batt_volts > 10){
+    batt_volts = 10;
+  }
+  
+  if (pod_volts > 10){
+    pod_volts = 10;
+  }
+  
   strcpy_P(buffer, (char*)pgm_read_word(&(string_table[0]))); //Retrieving variables and copying to buffer
   tv.print(TOP_X, TOP_Y, buffer);
-  drawBattery(22, TOP_Y, BATT_LENGTH, BATT_HEIGHT);
+  drawBattery(22, TOP_Y, BATT_LENGTH, BATT_HEIGHT);  
   fillBattery(22, TOP_Y, batt_volts, BATT_HEIGHT); 
   
   // if ROV battery low, print message
